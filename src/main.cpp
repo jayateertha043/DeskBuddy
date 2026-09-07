@@ -50,6 +50,8 @@ namespace
   constexpr uint32_t WIFI_RECONNECT_MS = 15UL * 1000UL;
   constexpr uint32_t PORTAL_AFTER_MS = 40UL * 1000UL; // open AP after this long offline
   constexpr uint32_t LOCATION_RETRY_MS = 60UL * 1000UL;
+  constexpr uint32_t RANDOM_EMOTE_INTERVAL_MS = 10UL * 60UL * 1000UL;
+  constexpr uint32_t RANDOM_EMOTE_DURATION_MS = 10UL * 1000UL;
   constexpr uint16_t DNS_PORT = 53;
 
   const char *const AP_SSID = "DeskBuddy-Setup";
@@ -71,16 +73,26 @@ namespace
     MOOD_YAWN,
     MOOD_GLANCE_LEFT,
     MOOD_GLANCE_RIGHT,
+    MOOD_WINK,
+    MOOD_LAUGH,
+    MOOD_SURPRISED,
+    MOOD_NERVOUS,
     MOOD_COUNT
   };
   const char *const MOOD_SLUG[MOOD_COUNT] = {
       "auto", "happy", "sad", "excited", "angry", "stretching",
       "sneezing", "sleeping", "confused", "curious", "dnd",
-      "yawn", "glance-left", "glance-right"};
+      "yawn", "glance-left", "glance-right", "wink", "laugh",
+      "surprised", "nervous"};
   const char *const MOOD_LABEL[MOOD_COUNT] = {
       "Auto (weather)", "Happy", "Sad", "Excited", "Angry", "Stretching",
       "Sneezing", "Sleeping", "Confused", "Curious", "Do not disturb",
-      "Yawn", "Look left", "Look right"};
+      "Yawn", "Look left", "Look right", "Wink", "Laugh", "Surprised",
+      "Nervous"};
+  const char *const MOOD_ICON[MOOD_COUNT] = {
+      "~", "^_^", "T_T", "*o*", ">_<", "-o-", "achoo", "zZz",
+      "?_-", "o_O", "...", "-O-", "<.<", ">.>", ";-)", "^o^",
+      "O_O", "o~o"};
 
   struct Weather
   {
@@ -106,6 +118,10 @@ namespace
   bool locResolved = true; // defaults ship pre-resolved
   String locStatus = LOCATION_CITY ", " LOCATION_COUNTRY;
   uint8_t moodSel = MOOD_AUTO;
+  bool randomEmotes = false;
+  uint32_t nextRandomEmoteAt = 0;
+  uint32_t randomEmoteEndsAt = 0;
+  uint8_t lastRandomMood = MOOD_AUTO;
   String userName;
   uint32_t nextLocationAttempt = 0;
   bool oledReady = false;
@@ -122,14 +138,17 @@ namespace
 
   enum BootStage : uint8_t
   {
-    BOOT_SLEEPING = 0,
-    BOOT_WAKING,
-    BOOT_YAWNING,
+    BOOT_WAITING = 0,
+    BOOT_OPENING,
+    BOOT_LOOK_LEFT,
+    BOOT_LOOK_RIGHT,
+    BOOT_DOUBLE_BLINK,
+    BOOT_EXCITED,
     BOOT_GREETING,
     BOOT_INTRO,
     BOOT_COMPLETE
   };
-  BootStage bootStage = BOOT_SLEEPING;
+  BootStage bootStage = BOOT_WAITING;
   uint32_t bootStageStartedAt = 0;
 
   float jsonNumber(const String &body, const char *key, float fallback)
@@ -274,6 +293,9 @@ namespace
     moodSel = prefs.getUChar("mood", MOOD_AUTO);
     if (moodSel >= MOOD_COUNT)
       moodSel = MOOD_AUTO;
+    randomEmotes = prefs.getBool("random", false);
+    if (randomEmotes)
+      moodSel = MOOD_AUTO; // Random mode rests on the weather face between reactions.
     userName = prefs.getString("name", "");
     prefs.end();
     locStatus = locResolved ? locCity + ", " + locCountry
@@ -297,6 +319,16 @@ namespace
     moodSel = m;
     prefs.begin("deskbuddy", false);
     prefs.putUChar("mood", m);
+    prefs.end();
+  }
+
+  void saveEmoteMode(bool useRandom)
+  {
+    randomEmotes = useRandom;
+    nextRandomEmoteAt = millis() + RANDOM_EMOTE_INTERVAL_MS;
+    randomEmoteEndsAt = 0;
+    prefs.begin("deskbuddy", false);
+    prefs.putBool("random", useRandom);
     prefs.end();
   }
 
@@ -445,10 +477,22 @@ namespace
                     "main{max-width:460px;margin:auto;padding:24px 18px}"
                     "h1{font-size:22px;margin:0 0 4px}.s{color:#a9b0c3;margin:0 0 18px}"
                     "label{display:block;color:#a9b0c3;font-size:13px;margin:14px 0 6px}"
-                    "input,button{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;"
+                    "input{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;"
                     "border:1px solid #424b67;background:#111522;color:#f7f8fc;font:inherit}"
-                    "button{margin-top:18px;background:#67e8c2;color:#08120f;font-weight:700;border:0;cursor:pointer}"
+                    "button{font:inherit;cursor:pointer}.save{width:100%;box-sizing:border-box;padding:11px;"
+                    "border-radius:10px;margin-top:18px;background:#67e8c2;color:#08120f;font-weight:700;border:0}"
                     ".card{background:#1b2030;border:1px solid #343b53;border-radius:16px;padding:20px}"
+                    ".emotions{margin-top:14px}.emotions h2{font-size:17px;margin:0 0 4px}"
+                    ".mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}"
+                    ".mode label{margin:0;padding:10px;border:1px solid #424b67;border-radius:10px;"
+                    "background:#111522;color:#f7f8fc;text-align:center;cursor:pointer}"
+                    ".mode input{width:auto;margin-right:6px}.emotes{display:grid;"
+                    "grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}"
+                    ".emote{min-height:76px;border:1px solid #424b67;border-radius:12px;"
+                    "background:#111522;color:#f7f8fc;padding:9px 5px}"
+                    ".emote.sel{border-color:#67e8c2;box-shadow:0 0 0 1px #67e8c2 inset}"
+                    ".face{display:block;color:#67e8c2;font:700 18px monospace;margin-bottom:5px}"
+                    ".hint{color:#a9b0c3;font-size:12px;margin:0 0 12px}"
                     ".st{padding:10px 12px;background:#121724;border-radius:10px;margin-bottom:14px;color:#a9b0c3}"
                     "</style></head><body><main>"
                     "<h1>DeskBuddy</h1><p class=s>Status &amp; settings</p><div class=card>");
@@ -486,19 +530,32 @@ namespace
     page += F("'><label>Your name</label>"
               "<input name=name maxlength=20 placeholder='Shown as \"Hi name!\"' value='");
     page += htmlEscape(userName);
-    page += F("'><label>Mood</label><select name=mood>");
+    page += F("'><button class=save type=submit>Save &amp; connect</button></form></div>"
+              "<div class='card emotions'><h2>Emotes</h2>"
+              "<p class=hint>Static holds the selected face. Random plays an emote for 10 seconds every 10 minutes.</p>"
+              "<form method=POST action=/emote><div class=mode>"
+              "<label><input type=radio name=mode value=static");
+    if (!randomEmotes)
+      page += F(" checked");
+    page += F(">Static</label><label><input type=radio name=mode value=random");
+    if (randomEmotes)
+      page += F(" checked");
+    page += F(">Random</label></div><div class=emotes>");
     for (uint8_t i = 0; i < MOOD_COUNT; ++i)
     {
-      page += F("<option value=");
-      page += MOOD_SLUG[i];
+      page += F("<button class='emote");
       if (i == moodSel)
-        page += F(" selected");
-      page += '>';
+        page += F(" sel");
+      page += F("' type=submit name=mood value='");
+      page += MOOD_SLUG[i];
+      page += F("'><span class=face>");
+      page += htmlEscape(String(MOOD_ICON[i]));
+      page += F("</span>");
       page += MOOD_LABEL[i];
-      page += F("</option>");
+      page += F("</button>");
     }
-    page += F("</select>"
-              "<button type=submit>Save &amp; connect</button></form></div></main></body></html>");
+    page += F("</div><button class=save type=submit>Save behavior</button>"
+              "</form></div></main></body></html>");
     server.send(200, F("text/html"), page);
   }
 
@@ -507,7 +564,61 @@ namespace
     for (uint8_t i = 0; i < MOOD_COUNT; ++i)
       if (slug.equalsIgnoreCase(MOOD_SLUG[i]))
         return i;
-    return moodSel;
+    return MOOD_COUNT;
+  }
+
+  void redirectHome()
+  {
+    server.sendHeader(F("Location"), F("/"), true);
+    server.send(303, F("text/plain"), F("Updated"));
+  }
+
+  void handleEmote()
+  {
+    const String mode = server.arg("mode");
+    if (mode != F("static") && mode != F("random"))
+    {
+      server.send(400, F("text/plain"), F("Choose Static or Random"));
+      return;
+    }
+
+    const bool requestedRandom = mode == F("random");
+    const bool modeChanged = requestedRandom != randomEmotes;
+    const bool moodChosen = server.hasArg("mood");
+    uint8_t requestedMood = moodSel;
+    if (moodChosen)
+    {
+      requestedMood = moodFromSlug(server.arg("mood"));
+      if (requestedMood >= MOOD_COUNT)
+      {
+        server.send(400, F("text/plain"), F("Unknown emote"));
+        return;
+      }
+      saveMood(requestedMood);
+    }
+    else if (modeChanged && !requestedRandom)
+    {
+      saveMood(moodSel);
+    }
+
+    if (modeChanged)
+      saveEmoteMode(requestedRandom);
+
+    if (requestedRandom)
+    {
+      nextRandomEmoteAt = millis() + RANDOM_EMOTE_INTERVAL_MS;
+      if (moodChosen && requestedMood != MOOD_AUTO)
+      {
+        randomEmoteEndsAt = millis() + RANDOM_EMOTE_DURATION_MS;
+        lastRandomMood = requestedMood;
+      }
+      else
+      {
+        moodSel = MOOD_AUTO;
+        randomEmoteEndsAt = 0;
+      }
+    }
+    redirectHome();
   }
 
   void handleSave()
@@ -516,7 +627,6 @@ namespace
     String rawPass = server.arg("pass");
     String city = server.arg("city");
     String country = server.arg("country");
-    String mood = server.arg("mood");
     String uname = server.arg("name");
     ssid.trim();
     city.trim();
@@ -536,13 +646,10 @@ namespace
     const bool wifiChanged = ssidChanged || passChanged;
     const bool locChanged = !city.equalsIgnoreCase(locCity) ||
                             !country.equalsIgnoreCase(locCountry);
-    const bool moodChanged = mood.length() && moodFromSlug(mood) != moodSel;
     const bool nameChanged = uname != userName;
 
     if (wifiChanged)
       saveCreds(ssid, passChanged ? rawPass : staPass);
-    if (moodChanged)
-      saveMood(moodFromSlug(mood));
     if (nameChanged)
       saveName(uname);
     if (locChanged)
@@ -553,8 +660,6 @@ namespace
       msg += F(" · reconnecting Wi-Fi");
     else if (locChanged)
       msg += F(" · updating location");
-    else if (moodChanged)
-      msg += F(" · mood updated");
     server.send(200, F("text/html"),
                 String(F("<!doctype html><meta charset=utf-8><meta name=viewport "
                          "content='width=device-width,initial-scale=1'>"
@@ -574,6 +679,7 @@ namespace
       return;
     server.on("/", handleRoot);
     server.on("/save", HTTP_POST, handleSave);
+    server.on("/emote", HTTP_POST, handleEmote);
     server.onNotFound(handleRoot); // serves dashboard + captive-portal catch-all
     server.begin();
     webStarted = true;
@@ -808,26 +914,49 @@ namespace
     display.print(line);
   }
 
-  // Returns true until the one-shot wake-up animation has finished. Keeping
-  // this state machine non-blocking lets Wi-Fi, NTP, and the web portal run.
+  void drawBootSmile(int xOffset = 0, int yOffset = 0)
+  {
+    display.drawLine(53 + xOffset, 47 + yOffset, 59 + xOffset, 53 + yOffset, SSD1306_WHITE);
+    display.drawLine(59 + xOffset, 53 + yOffset, 69 + xOffset, 53 + yOffset, SSD1306_WHITE);
+    display.drawLine(69 + xOffset, 53 + yOffset, 75 + xOffset, 47 + yOffset, SSD1306_WHITE);
+  }
+
+  int doubleBlinkHeight(uint32_t elapsed)
+  {
+    uint32_t phase = elapsed;
+    if (phase >= 500)
+      phase -= 500; // second blink after a short, expressive pause
+    if (phase < 170)
+      return 16 - static_cast<int>(14.0f * easeLiquid(phase / 170.0f));
+    if (phase < 350)
+      return 2 + static_cast<int>(14.0f * easeLiquid((phase - 170) / 180.0f));
+    return 16;
+  }
+
+  // Face-only wake-up choreography inspired by the smooth transitions and
+  // directional gaze principles of the open-source FluxGarage RoboEyes project.
+  // This original state machine stays non-blocking so networking keeps running.
   bool renderBootAnimation()
   {
     if (bootStage == BOOT_COMPLETE)
       return false;
 
     const int hour = localHour();
-    if (bootStage == BOOT_SLEEPING && weather.valid && hour >= 0)
+    if (bootStage == BOOT_WAITING && weather.valid && hour >= 0)
     {
-      bootStage = BOOT_WAKING;
+      bootStage = BOOT_OPENING;
       bootStageStartedAt = millis();
     }
 
     uint32_t elapsed = millis() - bootStageStartedAt;
-    const uint32_t duration = bootStage == BOOT_WAKING     ? 1700UL
-                              : bootStage == BOOT_YAWNING  ? 1900UL
-                              : bootStage == BOOT_GREETING ? 2300UL
-                              : bootStage == BOOT_INTRO    ? 2300UL
-                                                           : 0UL;
+    const uint32_t duration = bootStage == BOOT_OPENING      ? 1250UL
+                              : bootStage == BOOT_LOOK_LEFT  ? 750UL
+                              : bootStage == BOOT_LOOK_RIGHT ? 1050UL
+                              : bootStage == BOOT_DOUBLE_BLINK ? 1050UL
+                              : bootStage == BOOT_EXCITED    ? 1650UL
+                              : bootStage == BOOT_GREETING   ? 2200UL
+                              : bootStage == BOOT_INTRO      ? 2200UL
+                                                             : 0UL;
     if (duration && elapsed >= duration)
     {
       bootStage = static_cast<BootStage>(static_cast<uint8_t>(bootStage) + 1);
@@ -841,68 +970,77 @@ namespace
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
 
-    if (bootStage == BOOT_SLEEPING)
+    if (bootStage == BOOT_WAITING)
     {
-      // A pillow, blanket, gently breathing sleeping face, and floating Zs.
-      const int breathe = static_cast<int>(2.0f * sinf(millis() * 0.004f));
-      display.drawRoundRect(8, 25, 112, 34, 6, SSD1306_WHITE);
-      display.drawRoundRect(13, 29, 31, 18, 5, SSD1306_WHITE);
-      display.fillRoundRect(38, 35 + breathe, 76, 21 - breathe, 5, SSD1306_WHITE);
-      display.drawLine(20, 38 + breathe, 27, 41 + breathe, SSD1306_WHITE);
-      display.drawLine(27, 41 + breathe, 34, 38 + breathe, SSD1306_WHITE);
-      display.setCursor(88, 22 - static_cast<int>((millis() / 350) % 3));
-      display.print(F("z Z"));
-      if (!weather.valid || hour < 0)
-      {
-        display.setCursor(4, 5);
-        display.print(F("Teevee is sleeping"));
-      }
+      // Calm closed eyes while local time is being synchronized.
+      const int breathe = static_cast<int>(sinf(millis() * 0.004f));
+      display.drawLine(31, 32 + breathe, 43, 36 + breathe, SSD1306_WHITE);
+      display.drawLine(43, 36 + breathe, 55, 32 + breathe, SSD1306_WHITE);
+      display.drawLine(73, 32 + breathe, 85, 36 + breathe, SSD1306_WHITE);
+      display.drawLine(85, 36 + breathe, 97, 32 + breathe, SSD1306_WHITE);
+      display.drawLine(58, 50 + breathe, 70, 50 + breathe, SSD1306_WHITE);
     }
-    else if (bootStage == BOOT_WAKING)
+    else if (bootStage == BOOT_OPENING)
     {
-      const float progress = easeLiquid(min(1.0f, elapsed / 1300.0f));
-      const int eyeH = 2 + static_cast<int>(13.0f * progress);
-      const int lift = static_cast<int>(3.0f * sinf(progress * PI));
-      drawLiquidEye(43, 28 - lift, 22, eyeH);
-      drawLiquidEye(85, 28 - lift, 22, eyeH);
-      display.drawLine(57, 47, 62, 51, SSD1306_WHITE);
-      display.drawLine(62, 51, 68, 51, SSD1306_WHITE);
-      display.drawLine(68, 51, 73, 47, SSD1306_WHITE);
-      if (elapsed < 650)
-        drawCenteredText(F("...time to wake?"), 5);
-      else
-        drawCenteredText(F("* blink blink *"), 5);
+      const float progress = easeLiquid(min(1.0f, elapsed / 1100.0f));
+      const int eyeH = 2 + static_cast<int>(14.0f * progress);
+      const int eyeY = 34 - static_cast<int>(2.0f * progress);
+      drawLiquidEye(43, eyeY, 23, eyeH);
+      drawLiquidEye(85, eyeY, 23, eyeH);
+      display.drawLine(58, 50, 70, 50, SSD1306_WHITE);
     }
-    else if (bootStage == BOOT_YAWNING)
+    else if (bootStage == BOOT_LOOK_LEFT)
     {
-      const float yawn = sinf(min(1.0f, elapsed / 1900.0f) * PI);
-      const int eyeH = 12 - static_cast<int>(9.0f * yawn);
-      const int mouthW = 8 + static_cast<int>(10.0f * yawn);
-      const int mouthH = 5 + static_cast<int>(13.0f * yawn);
-      drawLiquidEye(43, 29, 22, eyeH);
-      drawLiquidEye(85, 29, 22, eyeH);
-      display.drawRoundRect(64 - mouthW / 2, 49 - mouthH / 2,
-                            mouthW, mouthH, max(2, min(mouthW, mouthH) / 2),
-                            SSD1306_WHITE);
-      drawCenteredText(F("Yaaawn..."), 5);
+      const float progress = easeLiquid(min(1.0f, elapsed / 600.0f));
+      const int gaze = -static_cast<int>(9.0f * progress);
+      drawLiquidEye(43 + gaze, 32, 23, 16 + static_cast<int>(3.0f * progress));
+      drawLiquidEye(85 + gaze, 32, 23, 16);
+      display.drawRoundRect(61, 48, 7, 7, 3, SSD1306_WHITE);
+    }
+    else if (bootStage == BOOT_LOOK_RIGHT)
+    {
+      const float progress = easeLiquid(min(1.0f, elapsed / 850.0f));
+      const int gaze = -9 + static_cast<int>(18.0f * progress);
+      drawLiquidEye(43 + gaze, 32, 23, 16);
+      drawLiquidEye(85 + gaze, 32, 23, 16 + static_cast<int>(3.0f * progress));
+      display.drawRoundRect(61, 48, 7, 7, 3, SSD1306_WHITE);
+    }
+    else if (bootStage == BOOT_DOUBLE_BLINK)
+    {
+      const int eyeH = doubleBlinkHeight(elapsed);
+      drawLiquidEye(43, 32, 23, eyeH);
+      drawLiquidEye(85, 32, 23, eyeH);
+      drawBootSmile();
+    }
+    else if (bootStage == BOOT_EXCITED)
+    {
+      const float progress = min(1.0f, elapsed / 1450.0f);
+      const float pop = fabsf(sinf(progress * 2.0f * PI));
+      const int bounce = static_cast<int>(5.0f * pop);
+      const int eyeW = 23 + static_cast<int>(5.0f * pop);
+      const int eyeH = 16 + static_cast<int>(4.0f * pop);
+      drawLiquidEye(43, 33 - bounce, eyeW, eyeH);
+      drawLiquidEye(85, 33 - bounce, eyeW, eyeH);
+      drawBootSmile(0, -bounce);
+      const int sparkle = 2 + static_cast<int>(2.0f * pop);
+      display.drawLine(15, 21 - sparkle, 15, 21 + sparkle, SSD1306_WHITE);
+      display.drawLine(15 - sparkle, 21, 15 + sparkle, 21, SSD1306_WHITE);
+      display.drawLine(113, 24 - sparkle, 113, 24 + sparkle, SSD1306_WHITE);
+      display.drawLine(113 - sparkle, 24, 113 + sparkle, 24, SSD1306_WHITE);
     }
     else if (bootStage == BOOT_GREETING)
     {
       const int bounce = static_cast<int>(2.0f * sinf(elapsed * 0.009f));
       drawHappyEyes(33 + bounce);
-      display.drawLine(54, 48 + bounce, 60, 54 + bounce, SSD1306_WHITE);
-      display.drawLine(60, 54 + bounce, 68, 54 + bounce, SSD1306_WHITE);
-      display.drawLine(68, 54 + bounce, 74, 48 + bounce, SSD1306_WHITE);
+      drawBootSmile(0, bounce);
       drawCenteredText(timeGreeting(hour), 5);
     }
     else if (bootStage == BOOT_INTRO)
     {
       const int sway = static_cast<int>(2.0f * sinf(elapsed * 0.008f));
-      drawLiquidEye(43 + sway, 32, 22, 14);
-      drawLiquidEye(85 + sway, 32, 22, 14);
-      display.drawLine(54 + sway, 48, 60 + sway, 54, SSD1306_WHITE);
-      display.drawLine(60 + sway, 54, 68 + sway, 54, SSD1306_WHITE);
-      display.drawLine(68 + sway, 54, 74 + sway, 48, SSD1306_WHITE);
+      drawLiquidEye(43 + sway, 32, 23, 16);
+      drawLiquidEye(85 + sway, 32, 23, 16);
+      drawBootSmile(sway);
       drawCenteredText(F("Hi! I am Teevee"), 5);
     }
 
@@ -979,6 +1117,7 @@ namespace
     bool frown = false;
     bool roundMouth = false;
     bool flatMouth = false;
+    bool laughMouth = false;
 
     switch (moodSel)
     {
@@ -1080,6 +1219,45 @@ namespace
         rightH += static_cast<int>(4 * action);
       break;
     }
+    case MOOD_WINK:
+    {
+      action = liquidEnvelope(elapsed % 3200, 180, 650, 900);
+      leftH = 13 - static_cast<int>(11 * action);
+      leftW = 22 + static_cast<int>(2 * action);
+      break;
+    }
+    case MOOD_LAUGH:
+    {
+      const float beat = fabsf(sinf((elapsed % 1100) / 1100.0f * PI));
+      const int lift = static_cast<int>(5.0f * beat);
+      leftY -= lift;
+      rightY -= lift;
+      mouthY -= lift;
+      happyEyes = true;
+      laughMouth = true;
+      action = beat;
+      break;
+    }
+    case MOOD_SURPRISED:
+    {
+      const float pulse = sinf(elapsed * 0.004f) * 0.5f + 0.5f;
+      leftW = rightW = 21 + static_cast<int>(4.0f * pulse);
+      leftH = rightH = 16 + static_cast<int>(4.0f * pulse);
+      leftY = rightY = 27 - static_cast<int>(2.0f * pulse);
+      roundMouth = true;
+      break;
+    }
+    case MOOD_NERVOUS:
+    {
+      const int jitter = static_cast<int>(2.0f * sinf(elapsed * 0.035f));
+      leftX += jitter;
+      rightX += jitter;
+      mouthX += jitter;
+      leftH = 12;
+      rightH = 9;
+      flatMouth = true;
+      break;
+    }
     case MOOD_SAD:
     {
       const int sink = static_cast<int>(2.0f * (sinf(elapsed * 0.0018f) * 0.5f + 0.5f));
@@ -1169,7 +1347,14 @@ namespace
     }
 
     // Mouth.
-    if (moodSel == MOOD_YAWN)
+    if (laughMouth)
+    {
+      const int mouthW = 10 + static_cast<int>(5 * action);
+      const int mouthH = 5 + static_cast<int>(5 * action);
+      display.drawRoundRect(mouthX - mouthW / 2, mouthY - mouthH / 2,
+                            mouthW, mouthH, min(mouthW, mouthH) / 2, SSD1306_WHITE);
+    }
+    else if (moodSel == MOOD_YAWN)
     {
       const int mouthW = 7 + static_cast<int>(9 * action);
       const int mouthH = 4 + static_cast<int>(10 * action);
@@ -1245,6 +1430,17 @@ namespace
       display.drawLine(108, 28 + faceOffset - sr, 108, 28 + faceOffset + sr, SSD1306_WHITE);
       display.drawLine(108 - sr, 28 + faceOffset, 108 + sr, 28 + faceOffset, SSD1306_WHITE);
     }
+    else if (moodSel == MOOD_NERVOUS)
+    {
+      const int drop = static_cast<int>(fmodf(elapsed * 0.018f, 22.0f));
+      const int dropY = 24 + faceOffset + drop;
+      if (dropY < 61)
+      {
+        display.drawLine(108, dropY, 106, dropY + 4, SSD1306_WHITE);
+        display.drawLine(108, dropY, 110, dropY + 4, SSD1306_WHITE);
+        display.fillCircle(108, dropY + 4, 2, SSD1306_WHITE);
+      }
+    }
   }
 
   // "Hi <name> !" animated in the top strip, replacing weather/clock.
@@ -1267,6 +1463,50 @@ namespace
       display.setCursor(x, 5);
       display.print(hi);
     }
+  }
+
+  void updateRandomEmote()
+  {
+    if (!randomEmotes)
+      return;
+
+    const uint32_t now = millis();
+    if (bootStage != BOOT_COMPLETE)
+    {
+      // Start the ten-minute cadence after the wake-up sequence is visible.
+      moodSel = MOOD_AUTO;
+      randomEmoteEndsAt = 0;
+      nextRandomEmoteAt = now + RANDOM_EMOTE_INTERVAL_MS;
+      return;
+    }
+
+    if (randomEmoteEndsAt && static_cast<int32_t>(now - randomEmoteEndsAt) >= 0)
+    {
+      moodSel = MOOD_AUTO;
+      randomEmoteEndsAt = 0;
+      animationFrame = 0;
+      Serial.println(F("Random emote finished; returning to weather."));
+    }
+
+    if (!nextRandomEmoteAt)
+    {
+      nextRandomEmoteAt = now + RANDOM_EMOTE_INTERVAL_MS;
+      return;
+    }
+    if (static_cast<int32_t>(now - nextRandomEmoteAt) < 0)
+      return;
+
+    uint8_t nextMood;
+    do
+    {
+      nextMood = static_cast<uint8_t>(random(1, MOOD_COUNT));
+    } while (MOOD_COUNT > 2 && nextMood == lastRandomMood);
+    moodSel = nextMood; // Do not write periodic changes and wear out flash.
+    lastRandomMood = nextMood;
+    animationFrame = 0;
+    randomEmoteEndsAt = now + RANDOM_EMOTE_DURATION_MS;
+    nextRandomEmoteAt = now + RANDOM_EMOTE_INTERVAL_MS;
+    Serial.printf("Random emote: %s\n", MOOD_LABEL[moodSel]);
   }
 
   void renderDisplay()
@@ -1344,6 +1584,13 @@ void setup()
   oledReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS);
   if (oledReady)
   {
+    // Push a completely blank frame first. The SSD1306 keeps its old pixels
+    // across a microcontroller reset, so drawing the first animation frame
+    // directly can briefly leave remnants of the previous screen visible.
+    display.clearDisplay();
+    display.display();
+    delay(80);
+
     bootStageStartedAt = millis();
     renderBootAnimation();
   }
@@ -1361,6 +1608,7 @@ void setup()
 
 void loop()
 {
+  updateRandomEmote();
   renderDisplay();
   if (webStarted)
     server.handleClient();
