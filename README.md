@@ -17,6 +17,8 @@ so features and behaviour are identical on both.
 
 - **Animated buddy face** — liquid eyes that blink, drift, and react to the weather
   (moon + Zzz at night, raindrops, snowflakes, lightning, fog, drifting clouds, sun rays).
+- **Wake-up animation** — on boot Teevee sleeps in bed, opens its eyes, yawns,
+  says good morning/afternoon/evening/night using local time, then introduces itself.
 - **Manual moods** — override the weather face with any of: happy, sad, excited,
   angry, stretching, sneezing, sleeping, confused, curious, do-not-disturb, yawn,
   look left, look right.

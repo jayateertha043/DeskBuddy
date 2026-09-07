@@ -120,6 +120,18 @@ namespace
   uint32_t lastAnimationFrame = 0;
   uint16_t animationFrame = 0;
 
+  enum BootStage : uint8_t
+  {
+    BOOT_SLEEPING = 0,
+    BOOT_WAKING,
+    BOOT_YAWNING,
+    BOOT_GREETING,
+    BOOT_INTRO,
+    BOOT_COMPLETE
+  };
+  BootStage bootStage = BOOT_SLEEPING;
+  uint32_t bootStageStartedAt = 0;
+
   float jsonNumber(const String &body, const char *key, float fallback)
   {
     const int currentStart = body.indexOf("\"current\":");
@@ -225,6 +237,28 @@ namespace
     char clockText[6];
     snprintf(clockText, sizeof(clockText), "%02d:%02d", parts.tm_hour, parts.tm_min);
     return String(clockText);
+  }
+
+  int localHour()
+  {
+    const time_t utcNow = time(nullptr);
+    if (utcNow < 100000)
+      return -1;
+    const time_t localNow = utcNow + utcOffsetSeconds;
+    struct tm parts{};
+    gmtime_r(&localNow, &parts);
+    return parts.tm_hour;
+  }
+
+  const __FlashStringHelper *timeGreeting(int hour)
+  {
+    if (hour >= 5 && hour < 12)
+      return F("Good morning!");
+    if (hour >= 12 && hour < 17)
+      return F("Good afternoon!");
+    if (hour >= 17 && hour < 21)
+      return F("Good evening!");
+    return F("Good night!");
   }
 
   void loadCreds()
@@ -766,6 +800,116 @@ namespace
     display.drawLine(84 + xOffset, y - 3, 93 + xOffset, y + 3, SSD1306_WHITE);
   }
 
+  void drawCenteredText(const __FlashStringHelper *text, int y)
+  {
+    const String line(text);
+    const int textW = static_cast<int>(line.length()) * 6;
+    display.setCursor(max(0, (static_cast<int>(OLED_WIDTH) - textW) / 2), y);
+    display.print(line);
+  }
+
+  // Returns true until the one-shot wake-up animation has finished. Keeping
+  // this state machine non-blocking lets Wi-Fi, NTP, and the web portal run.
+  bool renderBootAnimation()
+  {
+    if (bootStage == BOOT_COMPLETE)
+      return false;
+
+    const int hour = localHour();
+    if (bootStage == BOOT_SLEEPING && weather.valid && hour >= 0)
+    {
+      bootStage = BOOT_WAKING;
+      bootStageStartedAt = millis();
+    }
+
+    uint32_t elapsed = millis() - bootStageStartedAt;
+    const uint32_t duration = bootStage == BOOT_WAKING     ? 1700UL
+                              : bootStage == BOOT_YAWNING  ? 1900UL
+                              : bootStage == BOOT_GREETING ? 2300UL
+                              : bootStage == BOOT_INTRO    ? 2300UL
+                                                           : 0UL;
+    if (duration && elapsed >= duration)
+    {
+      bootStage = static_cast<BootStage>(static_cast<uint8_t>(bootStage) + 1);
+      bootStageStartedAt = millis();
+      elapsed = 0;
+      if (bootStage == BOOT_COMPLETE)
+        return false;
+    }
+
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+
+    if (bootStage == BOOT_SLEEPING)
+    {
+      // A pillow, blanket, gently breathing sleeping face, and floating Zs.
+      const int breathe = static_cast<int>(2.0f * sinf(millis() * 0.004f));
+      display.drawRoundRect(8, 25, 112, 34, 6, SSD1306_WHITE);
+      display.drawRoundRect(13, 29, 31, 18, 5, SSD1306_WHITE);
+      display.fillRoundRect(38, 35 + breathe, 76, 21 - breathe, 5, SSD1306_WHITE);
+      display.drawLine(20, 38 + breathe, 27, 41 + breathe, SSD1306_WHITE);
+      display.drawLine(27, 41 + breathe, 34, 38 + breathe, SSD1306_WHITE);
+      display.setCursor(88, 22 - static_cast<int>((millis() / 350) % 3));
+      display.print(F("z Z"));
+      if (!weather.valid || hour < 0)
+      {
+        display.setCursor(4, 5);
+        display.print(F("Teevee is sleeping"));
+      }
+    }
+    else if (bootStage == BOOT_WAKING)
+    {
+      const float progress = easeLiquid(min(1.0f, elapsed / 1300.0f));
+      const int eyeH = 2 + static_cast<int>(13.0f * progress);
+      const int lift = static_cast<int>(3.0f * sinf(progress * PI));
+      drawLiquidEye(43, 28 - lift, 22, eyeH);
+      drawLiquidEye(85, 28 - lift, 22, eyeH);
+      display.drawLine(57, 47, 62, 51, SSD1306_WHITE);
+      display.drawLine(62, 51, 68, 51, SSD1306_WHITE);
+      display.drawLine(68, 51, 73, 47, SSD1306_WHITE);
+      if (elapsed < 650)
+        drawCenteredText(F("...time to wake?"), 5);
+      else
+        drawCenteredText(F("* blink blink *"), 5);
+    }
+    else if (bootStage == BOOT_YAWNING)
+    {
+      const float yawn = sinf(min(1.0f, elapsed / 1900.0f) * PI);
+      const int eyeH = 12 - static_cast<int>(9.0f * yawn);
+      const int mouthW = 8 + static_cast<int>(10.0f * yawn);
+      const int mouthH = 5 + static_cast<int>(13.0f * yawn);
+      drawLiquidEye(43, 29, 22, eyeH);
+      drawLiquidEye(85, 29, 22, eyeH);
+      display.drawRoundRect(64 - mouthW / 2, 49 - mouthH / 2,
+                            mouthW, mouthH, max(2, min(mouthW, mouthH) / 2),
+                            SSD1306_WHITE);
+      drawCenteredText(F("Yaaawn..."), 5);
+    }
+    else if (bootStage == BOOT_GREETING)
+    {
+      const int bounce = static_cast<int>(2.0f * sinf(elapsed * 0.009f));
+      drawHappyEyes(33 + bounce);
+      display.drawLine(54, 48 + bounce, 60, 54 + bounce, SSD1306_WHITE);
+      display.drawLine(60, 54 + bounce, 68, 54 + bounce, SSD1306_WHITE);
+      display.drawLine(68, 54 + bounce, 74, 48 + bounce, SSD1306_WHITE);
+      drawCenteredText(timeGreeting(hour), 5);
+    }
+    else if (bootStage == BOOT_INTRO)
+    {
+      const int sway = static_cast<int>(2.0f * sinf(elapsed * 0.008f));
+      drawLiquidEye(43 + sway, 32, 22, 14);
+      drawLiquidEye(85 + sway, 32, 22, 14);
+      display.drawLine(54 + sway, 48, 60 + sway, 54, SSD1306_WHITE);
+      display.drawLine(60 + sway, 54, 68 + sway, 54, SSD1306_WHITE);
+      display.drawLine(68 + sway, 54, 74 + sway, 48, SSD1306_WHITE);
+      drawCenteredText(F("Hi! I am Teevee"), 5);
+    }
+
+    display.display();
+    return true;
+  }
+
   void drawFace()
   {
     const bool night = weather.valid && !weather.isDay;
@@ -1133,6 +1277,10 @@ namespace
       return;
     lastAnimationFrame = millis();
     ++animationFrame;
+
+    if (renderBootAnimation())
+      return;
+
     const bool night = weather.valid && !weather.isDay;
     static int8_t previousNightMode = -1;
     if (previousNightMode != static_cast<int8_t>(night))
@@ -1196,12 +1344,8 @@ void setup()
   oledReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS);
   if (oledReady)
   {
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-    display.setCursor(25, 26);
-    display.print(F("DeskBuddy :)"));
-    display.display();
+    bootStageStartedAt = millis();
+    renderBootAnimation();
   }
   else
   {
