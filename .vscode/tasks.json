@@ -1,0 +1,63 @@
+{
+  // Auto-detects the connected board (by USB VID) and builds/uploads the matching
+  // PlatformIO environment instead of always using default_envs (ESP32-C3).
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Upload and Monitor (Auto)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/auto_env.ps1",
+        "-Targets",
+        "upload,monitor"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Build (Auto)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/auto_env.ps1",
+        "-Targets",
+        "build"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Upload (Auto)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/auto_env.ps1",
+        "-Targets",
+        "upload"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
