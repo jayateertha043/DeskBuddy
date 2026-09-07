@@ -1,0 +1,16 @@
+{
+  "C_Cpp.default.intelliSenseMode": "gcc-arm",
+  "python.linting.enabled": false,
+  "[cpp]": {
+    "editor.formatOnSave": true
+  },
+  "[c]": {
+    "editor.formatOnSave": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    "/^& \"\\$env:USERPROFILE\\\\\\.platformio\\\\penv\\\\Scripts\\\\pio\\.exe\" run -e esp32-c3-devkitm-1 2>&1 \\| Select-Object -Last 60$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}
