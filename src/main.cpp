@@ -393,6 +393,8 @@ namespace
         out += "&gt;";
       else if (c == '"')
         out += "&quot;";
+      else if (c == '\'')
+        out += "&#39;"; // values sit in single-quoted attributes; unescaped ' breaks the form
       else
         out += c;
     }
