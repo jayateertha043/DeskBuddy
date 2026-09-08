@@ -17,14 +17,18 @@ so features and behaviour are identical on both.
 
 - **Animated buddy face** — liquid eyes that blink, drift, and react to the weather
   (moon + Zzz at night, raindrops, snowflakes, lightning, fog, drifting clouds, sun rays).
+- **Wake-up animation** — Teevee opens its eyes, looks left and right, double-blinks,
+  gets excited, gives a local-time greeting, and introduces itself.
 - **Manual moods** — override the weather face with any of: happy, sad, excited,
   angry, stretching, sneezing, sleeping, confused, curious, do-not-disturb, yawn,
-  look left, look right.
+  look left, look right, wink, laugh, surprised, and nervous.
 - **Live weather + clock** — temperature, condition, and an NTP-synced clock in the
   top strip, with the time zone resolved automatically for your location.
 - **Personal greeting** — periodically shows "Hi &lt;your name&gt;!".
 - **Web dashboard** — reachable any time on your network at `http://deskbuddy.local`
-  (or the device IP). Change Wi-Fi, location, name, and mood from any browser.
+  (or the device IP). Pick emotes from visual cards, hold one in Static mode, or
+  let Random mode play a reaction for 10 seconds every 10 minutes before returning
+  to the weather face.
 - **Recovery Wi-Fi portal** — if it can't get online, it opens a `DeskBuddy-Setup`
   access point with a captive portal so you can fix the credentials.
 - **City/country geocoding** — enter a city and country; coordinates are resolved
@@ -148,6 +152,7 @@ DeskBuddy-SuperMini/
 
 - Weather & geocoding: [Open-Meteo](https://open-meteo.com/)
 - Display: [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library) + [SSD1306](https://github.com/adafruit/Adafruit_SSD1306)
+- Boot-motion inspiration: [FluxGarage RoboEyes](https://github.com/FluxGarage/RoboEyes)
 - ESP8266 storage: [vshymanskyy/Preferences](https://github.com/vshymanskyy/Preferences)
 
 ## License
