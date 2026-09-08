@@ -3,5 +3,5 @@
 
 namespace ScreenHeader
 {
-  void draw();
+    void draw();
 }

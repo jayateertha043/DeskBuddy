@@ -3,7 +3,7 @@
 
 namespace ScreenBoot
 {
-  void begin();    // start the boot clock
-  bool render();   // draw one frame; returns true while still animating
-  bool complete(); // true once the wake-up sequence has finished
+    void begin();    // start the boot clock
+    bool render();   // draw one frame; returns true while still animating
+    bool complete(); // true once the wake-up sequence has finished
 }

@@ -3,6 +3,6 @@
 
 namespace ScreenWeather
 {
-  void drawIcon(int x, int y, int code); // header weather glyph
-  void drawFace();                        // full idle face + effects
+    void drawIcon(int x, int y, int code); // header weather glyph
+    void drawFace();                       // full idle face + effects
 }

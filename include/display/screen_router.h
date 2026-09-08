@@ -3,5 +3,5 @@
 
 namespace ScreenRouter
 {
-  void render();
+    void render();
 }

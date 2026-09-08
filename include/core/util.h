@@ -5,7 +5,7 @@
 
 namespace Util
 {
-  String urlEncode(const String &value);
-  String htmlEscape(const String &in);
-  bool coordinatesValid(double lat, double lon);
+    String urlEncode(const String &value);
+    String htmlEscape(const String &in);
+    bool coordinatesValid(double lat, double lon);
 }

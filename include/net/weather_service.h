@@ -5,10 +5,10 @@
 
 namespace WeatherService
 {
-  const Weather &data();
-  void requestNow();             // fetch weather at the next loop tick
-  void requestLocationRefresh(); // re-resolve city/country immediately
-  bool resolveLocation();
-  void updateWeather();
-  void loop();
+    const Weather &data();
+    void requestNow();             // fetch weather at the next loop tick
+    void requestLocationRefresh(); // re-resolve city/country immediately
+    bool resolveLocation();
+    void updateWeather();
+    void loop();
 }

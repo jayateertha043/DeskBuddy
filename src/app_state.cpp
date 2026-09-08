@@ -17,8 +17,8 @@ const char *const MOOD_ICON[MOOD_COUNT] = {
 
 uint8_t moodFromSlug(const String &slug)
 {
-  for (uint8_t i = 0; i < MOOD_COUNT; ++i)
-    if (slug.equalsIgnoreCase(MOOD_SLUG[i]))
-      return i;
-  return MOOD_COUNT;
+    for (uint8_t i = 0; i < MOOD_COUNT; ++i)
+        if (slug.equalsIgnoreCase(MOOD_SLUG[i]))
+            return i;
+    return MOOD_COUNT;
 }

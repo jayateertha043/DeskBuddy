@@ -13,6 +13,7 @@
 #include "net/weather_service.h"
 #include "net/web_portal.h"
 #include "net/wifi_manager.h"
+#include "pomodoro.h"
 
 void setup()
 {
@@ -37,6 +38,7 @@ void setup()
 
 void loop()
 {
+  Pomodoro::update();
   EmoteDirector::update();
   ScreenRouter::render();
   WebPortal::handle();

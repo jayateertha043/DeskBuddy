@@ -5,13 +5,13 @@
 
 namespace WifiManager
 {
-  void initLed();
-  void begin();     // start STA connection (settings must be loaded first)
-  void reconnect(); // re-apply credentials without resetting offline timer
-  void startPortal();
-  void stopPortal();
-  bool isPortalActive();
-  void handlePortalDns();
-  void handleMdns();
-  void loop();
+    void initLed();
+    void begin();     // start STA connection (settings must be loaded first)
+    void reconnect(); // re-apply credentials without resetting offline timer
+    void startPortal();
+    void stopPortal();
+    bool isPortalActive();
+    void handlePortalDns();
+    void handleMdns();
+    void loop();
 }

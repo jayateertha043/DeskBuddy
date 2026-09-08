@@ -5,7 +5,7 @@
 
 namespace WebPortal
 {
-  void start();
-  void handle();
-  bool started();
+    void start();
+    void handle();
+    bool started();
 }

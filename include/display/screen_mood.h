@@ -3,5 +3,5 @@
 
 namespace ScreenMood
 {
-  void draw();
+    void draw();
 }
