@@ -85,7 +85,7 @@ required. To force one: `pio run -t upload --upload-port COMx`.
 
 1. On first boot the device tries to connect using the compile-time defaults
    (`WIFI_SSID`, `WIFI_PASSWORD`, `LOCATION_CITY`, `LOCATION_COUNTRY` at the top of
-   [src/main.cpp](src/main.cpp)). Edit those to your own values, **or** use the portal below.
+   [include/config.h](include/config.h)). Edit those to your own values, **or** use the portal below.
 2. If it can't get online within ~40 s, it opens a recovery access point:
    - **SSID:** `DeskBuddy-Setup`  ·  **Password:** `12345678`  ·  **URL:** `http://192.168.4.1`
 3. Connect to that AP, open the page, and enter your **Wi-Fi**, **City**, **Country**,
@@ -111,21 +111,52 @@ required. To force one: `pio run -t upload --upload-port COMx`.
 
 ## Project structure
 
+The application is split into small, single-responsibility modules. Each module
+owns its own state and exposes a narrow namespace API, so `main.cpp` is just the
+wiring. The same tree compiles for both chips.
+
 ```
 DeskBuddy-SuperMini/
-├── platformio.ini        # Envs for both boards + dependencies
-├── src/
-│   └── main.cpp          # Shared application (compiled for both chips)
+├── platformio.ini            # Envs for both boards + dependencies
 ├── include/
-│   └── platform.h        # Chip abstraction (WiFi, web, mDNS, HTTP, TLS, storage, pins)
-├── README.md             # This file
-├── QUICKSTART.md         # 5-minute setup
-└── HARDWARE.md           # Wiring details & troubleshooting
+│   ├── platform.h            # Chip abstraction (WiFi, web, mDNS, HTTP, TLS, storage, pins)
+│   ├── config.h              # Compile-time defaults + hardware/timing constants
+│   ├── app_state.h           # Shared types: Mood, Weather, BootStage, weather-code helpers
+│   ├── core/                 # settings, clock, json_lite, util
+│   ├── net/                  # wifi_manager, weather_service, web_portal
+│   └── display/              # canvas, screen_boot/weather/mood/header, emote_director, screen_router
+├── src/
+│   ├── main.cpp              # Composition root: setup() + loop() only
+│   ├── app_state.cpp
+│   ├── core/                 # settings, clock, json_lite, util
+│   ├── net/                  # wifi_manager, weather_service, web_portal
+│   └── display/              # per-screen renderers + shared canvas
+├── README.md                 # This file
+├── QUICKSTART.md             # 5-minute setup
+└── HARDWARE.md               # Wiring details & troubleshooting
 ```
+
+Module responsibilities:
+
+| Layer | Module | Owns |
+|-------|--------|------|
+| core  | `Settings` | NVS/Preferences + all persisted values |
+| core  | `Clock` | NTP time, UTC offset, greetings |
+| core  | `Json` / `Util` | response parsing, URL/HTML encoding, geo validation |
+| net   | `WifiManager` | STA connect, reconnect, recovery AP portal, mDNS, status LED |
+| net   | `WeatherService` | geocoding + forecast fetch, current `Weather` snapshot |
+| net   | `WebPortal` | dashboard + captive-portal HTTP handlers |
+| display | `Canvas` | the SSD1306 panel + shared drawing primitives |
+| display | `ScreenBoot/Weather/Mood/Header` | one screen each |
+| display | `EmoteDirector` | random-emote scheduling |
+| display | `ScreenRouter` | frame pacing + which screen to draw |
 
 ## Architecture notes
 
-- **One codebase, two chips.** `main.cpp` is platform-independent; `platform.h`
+- **Modular, single-responsibility source.** Behaviour is grouped into `core/`,
+  `net/`, and `display/` modules (see the table above), each owning its state and
+  exposing a small namespace API. `main.cpp` only wires them together.
+- **One codebase, two chips.** The modules are platform-independent; `platform.h`
   supplies typedefs and small inline helpers for each target:
   - `WebServerClass` — `WebServer` (ESP32) vs `ESP8266WebServer`.
   - `SecureHttp` — stack `WiFiClientSecure` on ESP32, heap-allocated
