@@ -271,6 +271,8 @@ namespace
 
   const __FlashStringHelper *timeGreeting(int hour)
   {
+    if (hour < 0) // time not synced yet (no WiFi/NTP)
+      return F("Welcome!");
     if (hour >= 5 && hour < 12)
       return F("Good morning!");
     if (hour >= 12 && hour < 17)
@@ -942,21 +944,23 @@ namespace
       return false;
 
     const int hour = localHour();
-    if (bootStage == BOOT_WAITING && weather.valid && hour >= 0)
+    // Start the boot animation immediately on power-up. WiFi/time/weather are
+    // fetched in parallel, so we no longer wait for them before animating.
+    if (bootStage == BOOT_WAITING)
     {
       bootStage = BOOT_OPENING;
       bootStageStartedAt = millis();
     }
 
     uint32_t elapsed = millis() - bootStageStartedAt;
-    const uint32_t duration = bootStage == BOOT_OPENING      ? 1250UL
-                              : bootStage == BOOT_LOOK_LEFT  ? 750UL
-                              : bootStage == BOOT_LOOK_RIGHT ? 1050UL
+    const uint32_t duration = bootStage == BOOT_OPENING        ? 1250UL
+                              : bootStage == BOOT_LOOK_LEFT    ? 750UL
+                              : bootStage == BOOT_LOOK_RIGHT   ? 1050UL
                               : bootStage == BOOT_DOUBLE_BLINK ? 1050UL
-                              : bootStage == BOOT_EXCITED    ? 1650UL
-                              : bootStage == BOOT_GREETING   ? 2200UL
-                              : bootStage == BOOT_INTRO      ? 2200UL
-                                                             : 0UL;
+                              : bootStage == BOOT_EXCITED      ? 1650UL
+                              : bootStage == BOOT_GREETING     ? 2200UL
+                              : bootStage == BOOT_INTRO        ? 2200UL
+                                                               : 0UL;
     if (duration && elapsed >= duration)
     {
       bootStage = static_cast<BootStage>(static_cast<uint8_t>(bootStage) + 1);
@@ -1041,7 +1045,7 @@ namespace
       drawLiquidEye(43 + sway, 32, 23, 16);
       drawLiquidEye(85 + sway, 32, 23, 16);
       drawBootSmile(sway);
-      drawCenteredText(F("Hi! I am Teevee"), 5);
+      drawCenteredText(F("Hi! I am DeskBuddy"), 5);
     }
 
     display.display();
