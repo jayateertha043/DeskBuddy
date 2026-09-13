@@ -58,6 +58,58 @@
       ],
       "group": "build",
       "problemMatcher": []
+    },
+    {
+      "label": "Build & Upload OTA (esp32-c3-devkitm-1) - deskbuddy.local",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" run -e esp32-c3-devkitm-1 -t upload --upload-port deskbuddy.local"
+      ],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Build & Upload OTA (esp32-c3-devkitm-1) - Custom IP/Hostname",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$host_or_ip = Read-Host 'Enter device hostname or IP'; & \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" run -e esp32-c3-devkitm-1 -t upload --upload-port $host_or_ip"
+      ],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Upload OTA (esp32-c3-devkitm-1) - deskbuddy.local",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" run -e esp32-c3-devkitm-1 -t upload --upload-port deskbuddy.local"
+      ],
+      "group": "build",
+      "problemMatcher": []
     }
   ]
 }

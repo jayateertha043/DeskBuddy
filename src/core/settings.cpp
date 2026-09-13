@@ -18,7 +18,7 @@ namespace Settings
         bool locResolved = true; // defaults ship pre-resolved
         String locStatus = LOCATION_CITY ", " LOCATION_COUNTRY;
         uint8_t moodSel = MOOD_AUTO;
-        bool randomEmotes = false;
+        uint8_t emoteModeVal = EMOTE_STATIC;
         String userName;
         uint16_t pomoMinutes = 25;
     }
@@ -36,9 +36,18 @@ namespace Settings
         moodSel = prefs.getUChar("mood", MOOD_AUTO);
         if (moodSel >= MOOD_COUNT)
             moodSel = MOOD_AUTO;
-        randomEmotes = prefs.getBool("random", false);
-        if (randomEmotes)
-            moodSel = MOOD_AUTO; // Random mode rests on the weather face between reactions.
+        // Try to load new emoteMode first; if not found, check old "random" bool key
+        emoteModeVal = prefs.getUChar("emotemode", 255);
+        if (emoteModeVal == 255)
+        {
+            // Fallback for old installations using bool "random"
+            bool oldRandom = prefs.getBool("random", false);
+            emoteModeVal = oldRandom ? EMOTE_RANDOM : EMOTE_STATIC;
+        }
+        if (emoteModeVal >= 3) // Ensure it's a valid mode
+            emoteModeVal = EMOTE_STATIC;
+        if (emoteModeVal == EMOTE_RANDOM || emoteModeVal == EMOTE_LOOP)
+            moodSel = MOOD_AUTO; // Random/Loop modes rest on the weather face between reactions.
         userName = prefs.getString("name", "");
         pomoMinutes = prefs.getUShort("pomomin", 25);
         if (pomoMinutes == 0 || pomoMinutes > 180)
@@ -57,7 +66,8 @@ namespace Settings
     bool resolved() { return locResolved; }
     const String &status() { return locStatus; }
     uint8_t mood() { return moodSel; }
-    bool randomMode() { return randomEmotes; }
+    uint8_t emoteMode() { return emoteModeVal; }
+    bool randomMode() { return emoteModeVal == EMOTE_RANDOM; }
     const String &name() { return userName; }
     uint16_t pomodoroMinutes() { return pomoMinutes; }
 
@@ -88,11 +98,13 @@ namespace Settings
         moodSel = m;
     }
 
-    void saveEmoteMode(bool useRandom)
+    void saveEmoteMode(uint8_t mode)
     {
-        randomEmotes = useRandom;
+        if (mode >= 3) // Ensure valid mode
+            mode = EMOTE_STATIC;
+        emoteModeVal = mode;
         prefs.begin("deskbuddy", false);
-        prefs.putBool("random", useRandom);
+        prefs.putUChar("emotemode", mode);
         prefs.end();
     }
 

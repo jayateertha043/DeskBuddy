@@ -16,14 +16,15 @@ namespace Settings
     bool resolved();
     const String &status();
     uint8_t mood();
-    bool randomMode();
+    uint8_t emoteMode();
+    bool randomMode(); // deprecated: use emoteMode() == EMOTE_RANDOM
     const String &name();
     uint16_t pomodoroMinutes();
 
     void saveCreds(const String &ssid, const String &pass);
-    void saveMood(uint8_t m); // persist + apply
-    void setMood(uint8_t m);  // apply only (no flash write)
-    void saveEmoteMode(bool useRandom);
+    void saveMood(uint8_t m);         // persist + apply
+    void setMood(uint8_t m);          // apply only (no flash write)
+    void saveEmoteMode(uint8_t mode); // 0=static, 1=random, 2=loop
     void saveName(const String &name);
     void saveLocationInput(const String &city, const String &country);
     void applyResolvedLocation(const String &city, const String &country,

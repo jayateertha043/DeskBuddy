@@ -13,6 +13,7 @@
 #include "net/weather_service.h"
 #include "net/web_portal.h"
 #include "net/wifi_manager.h"
+#include "net/ota_service.h"
 #include "pomodoro.h"
 
 void setup()
@@ -34,6 +35,7 @@ void setup()
   Settings::load();
   WifiManager::begin();
   Clock::beginNtp();
+  OtaService::init();
 }
 
 void loop()
@@ -46,5 +48,6 @@ void loop()
   WifiManager::handleMdns();
   WifiManager::loop();
   WeatherService::loop();
+  OtaService::update();
   delay(5);
 }

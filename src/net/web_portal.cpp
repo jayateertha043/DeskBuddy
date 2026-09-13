@@ -82,15 +82,18 @@ namespace WebPortal
             page += Util::htmlEscape(Settings::name());
             page += F("'><button class=save type=submit>Save &amp; connect</button></form></div>"
                       "<div class='card emotions'><h2>Emotes</h2>"
-                      "<p class=hint>Static holds the selected face. Random plays an emote for 10 seconds every 10 minutes.</p>"
+                      "<p class=hint>Static holds the selected face. Random plays an emote for 10 seconds every 10 minutes. Loop cycles through all emotes every 10 seconds.</p>"
                       "<form method=POST action=/emote><div class=mode>"
                       "<label><input type=radio name=mode value=static");
-            if (!Settings::randomMode())
+            if (Settings::emoteMode() == EMOTE_STATIC)
                 page += F(" checked");
             page += F(">Static</label><label><input type=radio name=mode value=random");
-            if (Settings::randomMode())
+            if (Settings::emoteMode() == EMOTE_RANDOM)
                 page += F(" checked");
-            page += F(">Random</label></div><div class=emotes>");
+            page += F(">Random</label><label><input type=radio name=mode value=loop");
+            if (Settings::emoteMode() == EMOTE_LOOP)
+                page += F(" checked");
+            page += F(">Loop</label></div><div class=emotes>");
             for (uint8_t i = 0; i < MOOD_COUNT; ++i)
             {
                 page += F("<button class='emote");
@@ -130,7 +133,22 @@ namespace WebPortal
                       "<button class=save style='margin:0' type=submit>Start</button>"
                       "<button class=save style='margin:0;background:#ff6b6b' type=submit name=action value=stop>Stop</button>"
                       "</div></form></div>");
-            page += F("</main></body></html>");
+            page += F("</main><script>"
+                      "const moods=[");
+            for (uint8_t i = 0; i < MOOD_COUNT; ++i)
+            {
+                if (i > 0)
+                    page += F(",");
+                page += F("{idx:");
+                page += String(i);
+                page += F(",slug:'");
+                page += MOOD_SLUG[i];
+                page += F("',label:'");
+                page += MOOD_LABEL[i];
+                page += F("'}");
+            }
+            page += F("];"
+                      "</script></body></html>");
             server.send(200, F("text/html"), page);
         }
 
@@ -166,14 +184,22 @@ namespace WebPortal
         void handleEmote()
         {
             const String mode = server.arg("mode");
-            if (mode != F("static") && mode != F("random"))
+            if (mode != F("static") && mode != F("random") && mode != F("loop"))
             {
-                server.send(400, F("text/plain"), F("Choose Static or Random"));
+                server.send(400, F("text/plain"), F("Choose Static, Random, or Loop"));
                 return;
             }
 
-            const bool requestedRandom = mode == F("random");
-            const bool modeChanged = requestedRandom != Settings::randomMode();
+            uint8_t requestedMode;
+            if (mode == F("static"))
+                requestedMode = EMOTE_STATIC;
+            else if (mode == F("random"))
+                requestedMode = EMOTE_RANDOM;
+            else // "loop"
+                requestedMode = EMOTE_LOOP;
+
+            const uint8_t currentMode = Settings::emoteMode();
+            const bool modeChanged = requestedMode != currentMode;
             const bool moodChosen = server.hasArg("mood");
             uint8_t requestedMood = Settings::mood();
             if (moodChosen)
@@ -186,18 +212,18 @@ namespace WebPortal
                 }
                 Settings::saveMood(requestedMood);
             }
-            else if (modeChanged && !requestedRandom)
+            else if (modeChanged && requestedMode == EMOTE_STATIC)
             {
                 Settings::saveMood(Settings::mood());
             }
 
             if (modeChanged)
             {
-                Settings::saveEmoteMode(requestedRandom);
+                Settings::saveEmoteMode(requestedMode);
                 EmoteDirector::resetSchedule();
             }
 
-            if (requestedRandom)
+            if (requestedMode == EMOTE_RANDOM)
             {
                 EmoteDirector::setNextInterval();
                 if (moodChosen && requestedMood != MOOD_AUTO)
@@ -209,6 +235,11 @@ namespace WebPortal
                     Settings::setMood(MOOD_AUTO);
                     EmoteDirector::clearReaction();
                 }
+            }
+            else if (requestedMode == EMOTE_LOOP)
+            {
+                Settings::setMood(MOOD_AUTO);
+                EmoteDirector::clearReaction();
             }
             redirectHome();
         }
@@ -267,6 +298,7 @@ namespace WebPortal
                 WifiManager::reconnect(); // only reconnect when Wi-Fi credentials changed
             }
         }
+
     }
 
     void start()
