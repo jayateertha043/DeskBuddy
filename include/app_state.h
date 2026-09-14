@@ -23,6 +23,8 @@ enum Mood : uint8_t
     MOOD_LAUGH,
     MOOD_SURPRISED,
     MOOD_NERVOUS,
+    MOOD_MOON,
+    MOOD_CLOCK,
     MOOD_COUNT
 };
 

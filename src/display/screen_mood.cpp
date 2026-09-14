@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "app_state.h"
+#include "core/moon.h"
 #include "core/settings.h"
 #include "display/canvas.h"
 
@@ -11,6 +12,9 @@ using Canvas::display;
 using Canvas::drawHappyEyes;
 using Canvas::drawLiquidEye;
 using Canvas::easeLiquid;
+using Canvas::fastCos;
+using Canvas::fastSin;
+using Canvas::fastWrap;
 using Canvas::liquidEnvelope;
 
 namespace ScreenMood
@@ -37,7 +41,7 @@ namespace ScreenMood
         case MOOD_HAPPY:
         {
             const float beat = static_cast<float>(elapsed % 2600) / 2600.0f;
-            const int lift = static_cast<int>(5.0f * sinf(beat * PI));
+            const int lift = static_cast<int>(5.0f * fastSin(beat * PI));
             leftY -= lift;
             rightY -= lift;
             mouthY -= lift;
@@ -46,7 +50,7 @@ namespace ScreenMood
         case MOOD_EXCITED:
         {
             const float beat = static_cast<float>(elapsed % 1500) / 1500.0f;
-            const int lift = static_cast<int>(7.0f * fabsf(sinf(beat * PI)));
+            const int lift = static_cast<int>(7.0f * fabsf(fastSin(beat * PI)));
             leftY -= lift;
             rightY -= lift;
             mouthY -= lift;
@@ -141,7 +145,7 @@ namespace ScreenMood
         }
         case MOOD_LAUGH:
         {
-            const float beat = fabsf(sinf((elapsed % 1100) / 1100.0f * PI));
+            const float beat = fabsf(fastSin((elapsed % 1100) / 1100.0f * PI));
             const int lift = static_cast<int>(5.0f * beat);
             leftY -= lift;
             rightY -= lift;
@@ -153,7 +157,7 @@ namespace ScreenMood
         }
         case MOOD_SURPRISED:
         {
-            const float pulse = sinf(elapsed * 0.004f) * 0.5f + 0.5f;
+            const float pulse = fastSin(elapsed * 0.004f) * 0.5f + 0.5f;
             leftW = rightW = 21 + static_cast<int>(4.0f * pulse);
             leftH = rightH = 16 + static_cast<int>(4.0f * pulse);
             leftY = rightY = 27 - static_cast<int>(2.0f * pulse);
@@ -162,7 +166,7 @@ namespace ScreenMood
         }
         case MOOD_NERVOUS:
         {
-            const int jitter = static_cast<int>(2.0f * sinf(elapsed * 0.035f));
+            const int jitter = static_cast<int>(2.0f * fastSin(elapsed * 0.035f));
             leftX += jitter;
             rightX += jitter;
             mouthX += jitter;
@@ -173,7 +177,7 @@ namespace ScreenMood
         }
         case MOOD_SAD:
         {
-            const int sink = static_cast<int>(2.0f * (sinf(elapsed * 0.0018f) * 0.5f + 0.5f));
+            const int sink = static_cast<int>(2.0f * (fastSin(elapsed * 0.0018f) * 0.5f + 0.5f));
             leftY = rightY = 30 + sink;
             leftH = rightH = 11;
             mouthY = 47;
@@ -182,7 +186,7 @@ namespace ScreenMood
         }
         case MOOD_ANGRY:
         {
-            const int shake = static_cast<int>(1.5f * sinf(elapsed * 0.02f));
+            const int shake = static_cast<int>(1.5f * fastSin(elapsed * 0.02f));
             leftX += shake;
             rightX += shake;
             mouthX += shake;
@@ -192,7 +196,7 @@ namespace ScreenMood
         }
         case MOOD_CONFUSED:
         {
-            const int sway = static_cast<int>(3.0f * sinf(elapsed * 0.0016f));
+            const int sway = static_cast<int>(3.0f * fastSin(elapsed * 0.0016f));
             leftX += sway;
             rightX += sway;
             mouthX += sway;
@@ -203,7 +207,7 @@ namespace ScreenMood
         }
         case MOOD_SLEEP:
         {
-            const int breathe = static_cast<int>(2.0f * sinf(elapsed * 0.004f));
+            const int breathe = static_cast<int>(2.0f * fastSin(elapsed * 0.004f));
             leftY = rightY = 28 + breathe;
             mouthY = 45 + breathe;
             leftH = rightH = 3;
@@ -216,6 +220,67 @@ namespace ScreenMood
             leftH = rightH = 6;
             flatMouth = true;
             break;
+        }
+        case MOOD_MOON:
+        {
+            // Moon phase emote: render the illuminated portion of the lunar disk.
+            time_t now = time(nullptr);
+            float phase = Moon::getPhase(static_cast<uint32_t>(now));
+            Moon::Phase discretePhase = Moon::getDiscretePhase(phase);
+
+            const int centerX = 64;
+            // Gentle vertical float so the moon feels alive without distorting shape.
+            const int bob = static_cast<int>(1.5f * fastSin(elapsed * 0.0018f));
+            const int centerY = 34 + bob;
+            const int R = 13;
+
+            // Outline ring shows the full disk; the lit area is filled below.
+            display.drawCircle(centerX, centerY, R, SSD1306_WHITE);
+
+            // The terminator (light/shadow boundary) is a half-ellipse. For each
+            // scanline the lit span runs between one limb and the terminator,
+            // which scales with the row's half-width -> a natural curved edge.
+            const bool waxing = phase <= 0.5f;
+            const float k = fastCos(phase * 2.0f * PI); // +1 at new, -1 at full
+            for (int dy = -R; dy <= R; ++dy)
+            {
+                const float a = sqrtf(static_cast<float>(R * R - dy * dy));
+                const int ai = static_cast<int>(a);
+                if (ai <= 0)
+                    continue;
+                const int term = static_cast<int>(lroundf(k * a));
+                int x0, x1;
+                if (waxing) // illuminated on the right
+                {
+                    x0 = centerX + term;
+                    x1 = centerX + ai;
+                }
+                else // illuminated on the left
+                {
+                    x0 = centerX - ai;
+                    x1 = centerX - term;
+                }
+                if (x1 < x0)
+                    continue;
+                display.drawFastHLine(x0, centerY + dy, x1 - x0 + 1, SSD1306_WHITE);
+            }
+
+            // A couple of static "craters" add texture to the lit surface.
+            display.drawPixel(centerX + 5, centerY - 4, SSD1306_BLACK);
+            display.drawPixel(centerX - 3, centerY + 5, SSD1306_BLACK);
+            display.drawPixel(centerX + 2, centerY + 2, SSD1306_BLACK);
+
+            // Display moon phase label below (size 1 is the smallest GFX font;
+            // y=55 keeps the 8px glyphs fully on the 64px-tall screen).
+            display.setTextSize(1);
+            display.setTextColor(SSD1306_WHITE);
+            const char *phaseLabel = Moon::getLabel(discretePhase);
+            const int textX = 64 - (strlen(phaseLabel) * 3); // center text
+            display.setCursor(textX, 55);
+            display.println(phaseLabel);
+
+            // Skip normal face rendering
+            return;
         }
         default:
             break;
@@ -311,13 +376,13 @@ namespace ScreenMood
         // Mood-specific extras.
         if (moodSel == MOOD_SAD)
         {
-            const int ty1 = leftY + 6 + static_cast<int>(fmodf(elapsed * 0.02f, 24.0f));
+            const int ty1 = leftY + 6 + static_cast<int>(fastWrap(elapsed * 0.02f, 24.0f));
             if (ty1 < 62)
                 display.fillCircle(leftX - 6, ty1, 1, SSD1306_WHITE);
         }
         else if (moodSel == MOOD_SLEEP)
         {
-            const int zy1 = 30 + faceOffset - static_cast<int>(fmodf(elapsed * 0.012f, 16.0f));
+            const int zy1 = 30 + faceOffset - static_cast<int>(fastWrap(elapsed * 0.012f, 16.0f));
             display.setCursor(104, zy1);
             display.print('z');
             display.setCursor(110, zy1 - 5);
@@ -325,7 +390,7 @@ namespace ScreenMood
         }
         else if (moodSel == MOOD_CONFUSED)
         {
-            const int q = static_cast<int>(2.0f * sinf(elapsed * 0.004f));
+            const int q = static_cast<int>(2.0f * fastSin(elapsed * 0.004f));
             display.setCursor(104, 24 + faceOffset + q);
             display.print('?');
         }
@@ -337,7 +402,7 @@ namespace ScreenMood
         }
         else if (moodSel == MOOD_EXCITED)
         {
-            const int sr = 2 + static_cast<int>((sinf(elapsed * 0.006f) * 0.5f + 0.5f) * 2.0f);
+            const int sr = 2 + static_cast<int>((fastSin(elapsed * 0.006f) * 0.5f + 0.5f) * 2.0f);
             display.drawLine(20, 26 + faceOffset - sr, 20, 26 + faceOffset + sr, SSD1306_WHITE);
             display.drawLine(20 - sr, 26 + faceOffset, 20 + sr, 26 + faceOffset, SSD1306_WHITE);
             display.drawLine(108, 28 + faceOffset - sr, 108, 28 + faceOffset + sr, SSD1306_WHITE);
@@ -345,7 +410,7 @@ namespace ScreenMood
         }
         else if (moodSel == MOOD_NERVOUS)
         {
-            const int drop = static_cast<int>(fmodf(elapsed * 0.018f, 22.0f));
+            const int drop = static_cast<int>(fastWrap(elapsed * 0.018f, 22.0f));
             const int dropY = 24 + faceOffset + drop;
             if (dropY < 61)
             {

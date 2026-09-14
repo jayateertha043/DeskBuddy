@@ -11,6 +11,7 @@ using Canvas::animationFrame;
 using Canvas::display;
 using Canvas::drawHappyEyes;
 using Canvas::drawLiquidEye;
+using Canvas::fastSin;
 
 namespace ScreenWeather
 {
@@ -133,7 +134,7 @@ namespace ScreenWeather
             eyeHeight = 7;
         else if (blinkPhase >= 77 && blinkPhase <= 78)
             eyeHeight = 2;
-        const int drift = static_cast<int>(2.0f * sinf(animationFrame * 0.035f));
+        const int drift = static_cast<int>(2.0f * fastSin(animationFrame * 0.035f));
 
         drawWeatherEffects(night);
         if ((night && !storm) || fog)

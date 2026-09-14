@@ -8,6 +8,7 @@
 
 using Canvas::animationFrame;
 using Canvas::display;
+using Canvas::fastSin;
 
 namespace ScreenHeader
 {
@@ -19,7 +20,7 @@ namespace ScreenHeader
         const int textW = static_cast<int>(hi.length()) * 6;
         if (textW <= 122)
         {
-            const int sway = static_cast<int>(3.0f * sinf(animationFrame * 0.2f));
+            const int sway = static_cast<int>(3.0f * fastSin(animationFrame * 0.2f));
             display.setCursor(max(0, (128 - textW) / 2) + sway, 5);
             display.print(hi);
         }

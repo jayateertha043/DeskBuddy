@@ -12,6 +12,7 @@ using Canvas::drawCenteredText;
 using Canvas::drawHappyEyes;
 using Canvas::drawLiquidEye;
 using Canvas::easeLiquid;
+using Canvas::fastSin;
 
 namespace ScreenBoot
 {
@@ -86,7 +87,7 @@ namespace ScreenBoot
         if (bootStage == BOOT_WAITING)
         {
             // Calm closed eyes while local time is being synchronized.
-            const int breathe = static_cast<int>(sinf(millis() * 0.004f));
+            const int breathe = static_cast<int>(fastSin(millis() * 0.004f));
             display.drawLine(31, 32 + breathe, 43, 36 + breathe, SSD1306_WHITE);
             display.drawLine(43, 36 + breathe, 55, 32 + breathe, SSD1306_WHITE);
             display.drawLine(73, 32 + breathe, 85, 36 + breathe, SSD1306_WHITE);
@@ -128,7 +129,7 @@ namespace ScreenBoot
         else if (bootStage == BOOT_EXCITED)
         {
             const float progress = min(1.0f, elapsed / 1450.0f);
-            const float pop = fabsf(sinf(progress * 2.0f * PI));
+            const float pop = fabsf(fastSin(progress * 2.0f * PI));
             const int bounce = static_cast<int>(5.0f * pop);
             const int eyeW = 23 + static_cast<int>(5.0f * pop);
             const int eyeH = 16 + static_cast<int>(4.0f * pop);
@@ -143,14 +144,14 @@ namespace ScreenBoot
         }
         else if (bootStage == BOOT_GREETING)
         {
-            const int bounce = static_cast<int>(2.0f * sinf(elapsed * 0.009f));
+            const int bounce = static_cast<int>(2.0f * fastSin(elapsed * 0.009f));
             drawHappyEyes(33 + bounce);
             drawBootSmile(0, bounce);
             drawCenteredText(Clock::greeting(hour), 5);
         }
         else if (bootStage == BOOT_INTRO)
         {
-            const int sway = static_cast<int>(2.0f * sinf(elapsed * 0.008f));
+            const int sway = static_cast<int>(2.0f * fastSin(elapsed * 0.008f));
             drawLiquidEye(43 + sway, 32, 23, 16);
             drawLiquidEye(85 + sway, 32, 23, 16);
             drawBootSmile(sway);

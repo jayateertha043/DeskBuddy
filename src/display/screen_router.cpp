@@ -8,6 +8,7 @@
 #include "core/settings.h"
 #include "display/canvas.h"
 #include "display/screen_boot.h"
+#include "display/screen_clock.h"
 #include "display/screen_header.h"
 #include "display/screen_mood.h"
 #include "display/screen_pomodoro.h"
@@ -40,14 +41,17 @@ namespace ScreenRouter
 
         const Weather &weather = WeatherService::data();
         const bool night = weather.valid && !weather.isDay;
-        static int8_t previousNightMode = -1;
-        if (previousNightMode != static_cast<int8_t>(night))
+        // Base contrast follows the user's brightness slider; night dims it further
+        // (but never to black). Re-applied whenever either value changes.
+        const uint8_t base = Settings::brightness();
+        uint8_t desiredContrast = night ? static_cast<uint8_t>(base / 3) : base;
+        if (desiredContrast < 8)
+            desiredContrast = 8;
+        static int16_t lastContrast = -1;
+        if (lastContrast != static_cast<int16_t>(desiredContrast))
         {
-            // Reduce contrast at night but keep it clearly visible (dim(true) would
-            // drop contrast to 0 and blank the panel).
-            display.ssd1306_command(SSD1306_SETCONTRAST);
-            display.ssd1306_command(night ? 0x40 : 0xCF);
-            previousNightMode = night;
+            Canvas::setContrast(desiredContrast);
+            lastContrast = desiredContrast;
         }
         display.clearDisplay();
         display.setTextColor(SSD1306_WHITE);
@@ -57,6 +61,14 @@ namespace ScreenRouter
         if (Pomodoro::active())
         {
             ScreenPomodoro::draw();
+            display.display();
+            return;
+        }
+
+        // Digital clock emote owns the whole screen (no weather/clock header).
+        if (Settings::mood() == MOOD_CLOCK)
+        {
+            ScreenClock::draw();
             display.display();
             return;
         }

@@ -35,6 +35,7 @@ void setup()
   Settings::load();
   WifiManager::begin();
   Clock::beginNtp();
+  Clock::initBuildTime();  // Initialize compile-time fallback for offline time
   OtaService::init();
 }
 

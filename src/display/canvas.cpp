@@ -32,6 +32,14 @@ namespace Canvas
 
     bool ready() { return oledReady; }
 
+    void setContrast(uint8_t value)
+    {
+        if (!oledReady)
+            return;
+        display.ssd1306_command(SSD1306_SETCONTRAST);
+        display.ssd1306_command(value);
+    }
+
     float easeLiquid(float value)
     {
         if (value <= 0.0f)
@@ -54,6 +62,38 @@ namespace Canvas
                                      static_cast<float>(fallEnd - holdEnd));
         }
         return 0.0f;
+    }
+
+    // Range-reduce to [0, 2PI), fold to [0, PI/2], then 9th-order Taylor.
+    // Error < 4e-6 vs sinf on the folded interval — pixel output is identical.
+    float fastSin(float x)
+    {
+        constexpr float kTwoPi = 6.28318530718f;
+        constexpr float kPi = 3.14159265359f;
+        constexpr float kHalfPi = 1.57079632679f;
+        const int k = static_cast<int>(x * 0.15915494310f); // x / (2PI)
+        float r = x - static_cast<float>(k) * kTwoPi;
+        if (r < 0.0f)
+            r += kTwoPi;
+        float sign = 1.0f;
+        if (r > kPi)
+        {
+            r -= kPi;
+            sign = -1.0f;
+        }
+        if (r > kHalfPi)
+            r = kPi - r;
+        const float r2 = r * r;
+        const float s = r * (1.0f + r2 * (-0.16666667f + r2 * (0.00833333f +
+                                                               r2 * (-0.00019841f + r2 * 0.0000027557f))));
+        return sign * s;
+    }
+
+    float fastCos(float x) { return fastSin(x + 1.57079632679f); }
+
+    float fastWrap(float a, float m)
+    {
+        return a - m * static_cast<float>(static_cast<int>(a / m));
     }
 
     void drawLiquidEye(int centerX, int centerY, int width, int height)

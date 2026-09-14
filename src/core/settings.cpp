@@ -21,6 +21,52 @@ namespace Settings
         uint8_t emoteModeVal = EMOTE_STATIC;
         String userName;
         uint16_t pomoMinutes = 25;
+        uint8_t brightPct = 80;
+        uint8_t loopSeq[MOOD_COUNT];
+        uint8_t loopSeqLen = 0;
+        uint16_t loopSecs = 10;
+
+        void setDefaultLoopSeq()
+        {
+            loopSeqLen = 0;
+            for (uint8_t i = 1; i < MOOD_COUNT; ++i)
+                loopSeq[loopSeqLen++] = i;
+        }
+
+        // Parse an ordered CSV of mood indices into loopSeq (dedup, validated).
+        // Falls back to the full default list when the CSV yields nothing.
+        void parseLoopSeq(const String &csv)
+        {
+            loopSeqLen = 0;
+            int start = 0;
+            while (start < static_cast<int>(csv.length()) && loopSeqLen < MOOD_COUNT)
+            {
+                int comma = csv.indexOf(',', start);
+                if (comma < 0)
+                    comma = csv.length();
+                String tok = csv.substring(start, comma);
+                tok.trim();
+                if (tok.length())
+                {
+                    const int value = tok.toInt();
+                    if (value >= 0 && value < MOOD_COUNT) // 0 = auto (weather) face
+                    {
+                        bool dup = false;
+                        for (uint8_t k = 0; k < loopSeqLen; ++k)
+                            if (loopSeq[k] == value)
+                            {
+                                dup = true;
+                                break;
+                            }
+                        if (!dup)
+                            loopSeq[loopSeqLen++] = static_cast<uint8_t>(value);
+                    }
+                }
+                start = comma + 1;
+            }
+            if (loopSeqLen == 0)
+                setDefaultLoopSeq();
+        }
     }
 
     void load()
@@ -52,6 +98,23 @@ namespace Settings
         pomoMinutes = prefs.getUShort("pomomin", 25);
         if (pomoMinutes == 0 || pomoMinutes > 180)
             pomoMinutes = 25;
+        brightPct = prefs.getUChar("bright", 80);
+        if (brightPct < 5)
+            brightPct = 5;
+        if (brightPct > 100)
+            brightPct = 100;
+        {
+            const String seqCsv = prefs.getString("loopseq", "");
+            if (seqCsv.length())
+                parseLoopSeq(seqCsv);
+            else
+                setDefaultLoopSeq();
+        }
+        loopSecs = prefs.getUShort("loopsec", 10);
+        if (loopSecs < 3)
+            loopSecs = 3;
+        if (loopSecs > 300)
+            loopSecs = 300;
         prefs.end();
         locStatus = locResolved ? locCity + ", " + locCountry
                                 : String(F("Waiting to locate ")) + locCity;
@@ -70,6 +133,11 @@ namespace Settings
     bool randomMode() { return emoteModeVal == EMOTE_RANDOM; }
     const String &name() { return userName; }
     uint16_t pomodoroMinutes() { return pomoMinutes; }
+    uint8_t brightnessPercent() { return brightPct; }
+    uint8_t brightness() { return static_cast<uint8_t>((static_cast<uint16_t>(brightPct) * 255) / 100); }
+    uint8_t loopCount() { return loopSeqLen; }
+    uint8_t loopAt(uint8_t i) { return i < loopSeqLen ? loopSeq[i] : MOOD_AUTO; }
+    uint16_t loopSeconds() { return loopSecs; }
 
     void saveCreds(const String &ssid, const String &pass)
     {
@@ -123,6 +191,45 @@ namespace Settings
         pomoMinutes = minutes;
         prefs.begin("deskbuddy", false);
         prefs.putUShort("pomomin", minutes);
+        prefs.end();
+    }
+
+    void saveBrightness(uint8_t percent)
+    {
+        if (percent < 5)
+            percent = 5;
+        if (percent > 100)
+            percent = 100;
+        brightPct = percent;
+        prefs.begin("deskbuddy", false);
+        prefs.putUChar("bright", percent);
+        prefs.end();
+    }
+
+    void saveLoopSequence(const String &csv)
+    {
+        parseLoopSeq(csv);
+        String normalized;
+        for (uint8_t i = 0; i < loopSeqLen; ++i)
+        {
+            if (i)
+                normalized += ',';
+            normalized += loopSeq[i];
+        }
+        prefs.begin("deskbuddy", false);
+        prefs.putString("loopseq", normalized);
+        prefs.end();
+    }
+
+    void saveLoopSeconds(uint16_t seconds)
+    {
+        if (seconds < 3)
+            seconds = 3;
+        if (seconds > 300)
+            seconds = 300;
+        loopSecs = seconds;
+        prefs.begin("deskbuddy", false);
+        prefs.putUShort("loopsec", seconds);
         prefs.end();
     }
 

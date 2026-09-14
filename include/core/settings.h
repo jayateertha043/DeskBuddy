@@ -20,6 +20,11 @@ namespace Settings
     bool randomMode(); // deprecated: use emoteMode() == EMOTE_RANDOM
     const String &name();
     uint16_t pomodoroMinutes();
+    uint8_t brightnessPercent(); // 5-100 slider value
+    uint8_t brightness();        // mapped 0-255 OLED contrast
+    uint8_t loopCount();         // number of emotes in the loop playlist
+    uint8_t loopAt(uint8_t i);   // mood index at loop position i
+    uint16_t loopSeconds();      // seconds each loop emote is shown
 
     void saveCreds(const String &ssid, const String &pass);
     void saveMood(uint8_t m);         // persist + apply
@@ -31,4 +36,7 @@ namespace Settings
                                double lat, double lon);
     void setStatus(const String &status);
     void savePomodoroMinutes(uint16_t minutes);
+    void saveBrightness(uint8_t percent);   // clamp 5-100 + persist
+    void saveLoopSequence(const String &csv); // ordered CSV of mood indices
+    void saveLoopSeconds(uint16_t seconds);   // clamp 3-300 + persist
 }

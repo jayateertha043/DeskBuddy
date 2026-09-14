@@ -23,7 +23,7 @@ namespace EmoteDirector
     {
         nextRandomEmoteAt = millis() + RANDOM_EMOTE_INTERVAL_MS;
         randomEmoteEndsAt = 0;
-        loopNextChangeAt = millis() + 10000; // 10 seconds for loop mode
+        loopNextChangeAt = millis() + Settings::loopSeconds() * 1000UL;
         loopCurrentIndex = 0;
     }
 
@@ -50,7 +50,7 @@ namespace EmoteDirector
             // Start the cadence after the wake-up sequence is visible.
             Settings::setMood(MOOD_AUTO);
             randomEmoteEndsAt = 0;
-            loopNextChangeAt = now + 10000;
+            loopNextChangeAt = now + Settings::loopSeconds() * 1000UL;
             nextRandomEmoteAt = now + RANDOM_EMOTE_INTERVAL_MS;
             return;
         }
@@ -88,21 +88,26 @@ namespace EmoteDirector
         }
         else if (mode == EMOTE_LOOP)
         {
-            // Handle loop mode: cycle through all emotes every 10 seconds
+            // Loop mode: cycle through the user's chosen emote playlist every 10s.
             if (static_cast<int32_t>(now - loopNextChangeAt) >= 0)
             {
-                // Move to next mood in loop sequence (1 to MOOD_COUNT-1)
-                loopCurrentIndex++;
-                if (loopCurrentIndex >= MOOD_COUNT - 1)
+                const uint8_t count = Settings::loopCount();
+                const uint32_t interval = Settings::loopSeconds() * 1000UL;
+                if (count == 0)
+                {
+                    Settings::setMood(MOOD_AUTO);
+                    loopNextChangeAt = now + interval;
+                    return;
+                }
+                if (loopCurrentIndex >= count)
                     loopCurrentIndex = 0;
 
-                uint8_t nextMood = static_cast<uint8_t>(loopCurrentIndex + 1);
-                if (nextMood >= MOOD_COUNT)
-                    nextMood = MOOD_AUTO;
+                const uint8_t nextMood = Settings::loopAt(loopCurrentIndex);
+                loopCurrentIndex = (loopCurrentIndex + 1) % count;
 
                 Settings::setMood(nextMood); // Do not write periodic changes and wear out flash.
                 Canvas::animationFrame = 0;
-                loopNextChangeAt = now + 10000; // Next change in 10 seconds
+                loopNextChangeAt = now + interval;
                 Serial.printf("Loop emote: %s\n", MOOD_LABEL[Settings::mood()]);
             }
         }
