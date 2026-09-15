@@ -12,6 +12,7 @@
 #include "display/screen_header.h"
 #include "display/screen_mood.h"
 #include "display/screen_pomodoro.h"
+#include "display/screen_sticky.h"
 #include "display/screen_weather.h"
 #include "net/weather_service.h"
 #include "pomodoro.h"
@@ -69,6 +70,14 @@ namespace ScreenRouter
         if (Settings::mood() == MOOD_CLOCK)
         {
             ScreenClock::draw();
+            display.display();
+            return;
+        }
+
+        // Sticky note emote owns the whole screen (centered auto-sized text).
+        if (Settings::mood() == MOOD_STICKY)
+        {
+            ScreenSticky::draw();
             display.display();
             return;
         }

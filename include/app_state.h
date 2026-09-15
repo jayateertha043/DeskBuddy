@@ -25,6 +25,7 @@ enum Mood : uint8_t
     MOOD_NERVOUS,
     MOOD_MOON,
     MOOD_CLOCK,
+    MOOD_STICKY,
     MOOD_COUNT
 };
 
@@ -33,6 +34,13 @@ enum EmoteMode : uint8_t
     EMOTE_STATIC = 0,
     EMOTE_RANDOM = 1,
     EMOTE_LOOP = 2
+};
+
+// Power-saving strategy for the WiFi radio.
+enum PowerMode : uint8_t
+{
+    POWER_NONE = 0,  // WiFi always on (default behaviour)
+    POWER_SAVING = 1 // WiFi on-demand: scheduler wakes it before internet tasks
 };
 
 extern const char *const MOOD_SLUG[MOOD_COUNT];

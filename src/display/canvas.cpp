@@ -40,6 +40,13 @@ namespace Canvas
         display.ssd1306_command(value);
     }
 
+    void displayOff()
+    {
+        if (!oledReady)
+            return;
+        display.ssd1306_command(SSD1306_DISPLAYOFF);
+    }
+
     float easeLiquid(float value)
     {
         if (value <= 0.0f)

@@ -14,6 +14,8 @@ namespace WifiManager
         DNSServer dnsServer;
         bool portalActive = false;
         bool mdnsStarted = false;
+        bool radioIntendedOn = true; // false only when power-saving parks the radio
+        bool connectedOnce = false;  // latches true after the first successful STA connect
         uint32_t nextWifiRetry = 0;
         uint32_t offlineSince = 0;
 
@@ -46,6 +48,32 @@ namespace WifiManager
     }
 
     void reconnect() { beginWifi(); }
+
+    bool radioEnabled() { return radioIntendedOn; }
+
+    bool everConnected() { return connectedOnce; }
+
+    void setRadioEnabled(bool on)
+    {
+        if (on == radioIntendedOn)
+            return;
+        radioIntendedOn = on;
+        if (on)
+        {
+            Serial.println(F("Power: waking WiFi radio"));
+            nextWifiRetry = 0;
+            offlineSince = millis();
+            beginWifi();
+        }
+        else
+        {
+            Serial.println(F("Power: parking WiFi radio"));
+            stopPortal();
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_OFF);
+            digitalWrite(STATUS_LED, HIGH); // off
+        }
+    }
 
     bool isPortalActive() { return portalActive; }
 
@@ -95,6 +123,7 @@ namespace WifiManager
         if (currentStatus == WL_CONNECTED && previousStatus != WL_CONNECTED)
         {
             Serial.printf("Connected. IP: %s\n", WiFi.localIP().toString().c_str());
+            connectedOnce = true;
             digitalWrite(STATUS_LED, LOW); // on
             WeatherService::requestNow();
             stopPortal();
@@ -115,6 +144,11 @@ namespace WifiManager
             offlineSince = millis();
         }
         previousStatus = currentStatus;
+
+        // When the radio is intentionally parked (power saving), skip all
+        // reconnect and recovery-portal work until it is woken again.
+        if (!radioIntendedOn)
+            return;
 
         if (currentStatus != WL_CONNECTED &&
             static_cast<int32_t>(millis() - nextWifiRetry) >= 0)

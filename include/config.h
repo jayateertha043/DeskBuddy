@@ -48,6 +48,12 @@ namespace cfg
     constexpr uint32_t RANDOM_EMOTE_DURATION_MS = 10UL * 1000UL;
     constexpr uint16_t DNS_PORT = 53;
 
+    // Power-saving mode timings.
+    constexpr uint32_t BOOT_WIFI_WINDOW_MS = 30UL * 60UL * 1000UL;    // WiFi + dashboard stay on this long after a fresh boot
+    constexpr uint32_t WIFI_PREFETCH_LEAD_MS = 5UL * 60UL * 1000UL;   // wake the radio this early before a scheduled internet task
+    constexpr uint32_t POWER_SAVE_MAX_AWAKE_MS = 6UL * 60UL * 1000UL; // safety cap on radio on-time per fetch cycle
+    constexpr uint32_t QUIET_SLEEP_BOOT_GRACE_MS = 90UL * 1000UL;     // stay awake this long after boot before honoring quiet hours
+
     constexpr const char *AP_SSID = "DeskBuddy-Setup";
     constexpr const char *AP_PASSWORD = "12345678"; // >= 8 chars required by SoftAP
 }

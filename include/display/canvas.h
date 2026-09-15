@@ -13,6 +13,7 @@ namespace Canvas
     bool begin(); // Wire + panel init; returns true if the OLED is present
     bool ready();
     void setContrast(uint8_t value); // 0-255 OLED contrast (brightness)
+    void displayOff();               // power down the panel (before deep sleep)
 
     float easeLiquid(float value);
     float liquidEnvelope(uint32_t beat, uint32_t riseEnd, uint32_t holdEnd, uint32_t fallEnd);

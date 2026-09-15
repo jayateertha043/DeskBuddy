@@ -47,6 +47,13 @@ inline void platformWifiSleep(bool enable)
 inline void platformMdnsUpdate() { MDNS.update(); }
 inline void platformHttpTimeouts(HTTPClient &http) { http.setTimeout(9000); }
 
+// ESP8266 already boots at 80 MHz by default; nothing to lower.
+inline void platformLowerCpu() {}
+
+// ESP8266 timer deep sleep needs GPIO16 wired to RST and maxes out near ~3.5 h.
+inline void platformDeepSleep(uint64_t us) { ESP.deepSleep(us); }
+inline void platformDeepSleepForever() { ESP.deepSleep(0); } // until external RST
+
 // BearSSL's secure client is large; heap-allocate it so it can't blow the stack.
 struct SecureHttp
 {
@@ -64,6 +71,7 @@ struct SecureHttp
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_sleep.h>
 
 using WebServerClass = WebServer;
 
@@ -88,6 +96,21 @@ inline void platformHttpTimeouts(HTTPClient &http)
     http.setConnectTimeout(10000); // ms: bound TCP connect
     http.setTimeout(9000);
 }
+
+inline void platformDeepSleep(uint64_t us)
+{
+    esp_sleep_enable_timer_wakeup(us);
+    esp_deep_sleep_start();
+}
+
+inline void platformDeepSleepForever()
+{
+    // No wakeup source enabled: sleeps until a manual reset / power cycle.
+    esp_deep_sleep_start();
+}
+
+// Halve the core clock (160 -> 80 MHz) to cut active current; WiFi still works.
+inline void platformLowerCpu() { setCpuFrequencyMhz(80); }
 
 struct SecureHttp
 {

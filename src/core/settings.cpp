@@ -25,6 +25,11 @@ namespace Settings
         uint8_t loopSeq[MOOD_COUNT];
         uint8_t loopSeqLen = 0;
         uint16_t loopSecs = 10;
+        String stickyMsg = "Hello!";
+        uint8_t powerModeVal = POWER_NONE;
+        bool nightSleepOn = false;
+        uint16_t nightStartMin = 60;  // 01:00
+        uint16_t nightEndMin = 420;   // 07:00
 
         void setDefaultLoopSeq()
         {
@@ -115,6 +120,17 @@ namespace Settings
             loopSecs = 3;
         if (loopSecs > 300)
             loopSecs = 300;
+        stickyMsg = prefs.getString("sticky", "Hello!");
+        powerModeVal = prefs.getUChar("pwrmode", POWER_NONE);
+        if (powerModeVal > POWER_SAVING)
+            powerModeVal = POWER_NONE;
+        nightSleepOn = prefs.getBool("slpen", false);
+        nightStartMin = prefs.getUShort("slpstart", 60);
+        nightEndMin = prefs.getUShort("slpend", 420);
+        if (nightStartMin > 1439)
+            nightStartMin = 60;
+        if (nightEndMin > 1439)
+            nightEndMin = 420;
         prefs.end();
         locStatus = locResolved ? locCity + ", " + locCountry
                                 : String(F("Waiting to locate ")) + locCity;
@@ -138,6 +154,11 @@ namespace Settings
     uint8_t loopCount() { return loopSeqLen; }
     uint8_t loopAt(uint8_t i) { return i < loopSeqLen ? loopSeq[i] : MOOD_AUTO; }
     uint16_t loopSeconds() { return loopSecs; }
+    const String &stickyText() { return stickyMsg; }
+    uint8_t powerMode() { return powerModeVal; }
+    bool nightSleepEnabled() { return nightSleepOn; }
+    uint16_t nightSleepStart() { return nightStartMin; }
+    uint16_t nightSleepEnd() { return nightEndMin; }
 
     void saveCreds(const String &ssid, const String &pass)
     {
@@ -230,6 +251,40 @@ namespace Settings
         loopSecs = seconds;
         prefs.begin("deskbuddy", false);
         prefs.putUShort("loopsec", seconds);
+        prefs.end();
+    }
+
+    void saveStickyText(const String &text)
+    {
+        stickyMsg = text;
+        prefs.begin("deskbuddy", false);
+        prefs.putString("sticky", text);
+        prefs.end();
+    }
+
+    void savePowerMode(uint8_t mode)
+    {
+        if (mode > POWER_SAVING)
+            mode = POWER_NONE;
+        powerModeVal = mode;
+        prefs.begin("deskbuddy", false);
+        prefs.putUChar("pwrmode", mode);
+        prefs.end();
+    }
+
+    void saveNightSleep(bool enabled, uint16_t startMin, uint16_t endMin)
+    {
+        if (startMin > 1439)
+            startMin = 0;
+        if (endMin > 1439)
+            endMin = 0;
+        nightSleepOn = enabled;
+        nightStartMin = startMin;
+        nightEndMin = endMin;
+        prefs.begin("deskbuddy", false);
+        prefs.putBool("slpen", enabled);
+        prefs.putUShort("slpstart", startMin);
+        prefs.putUShort("slpend", endMin);
         prefs.end();
     }
 

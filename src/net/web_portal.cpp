@@ -7,6 +7,7 @@
 #include "display/emote_director.h"
 #include "net/weather_service.h"
 #include "net/wifi_manager.h"
+#include "net/power_manager.h"
 #include "pomodoro.h"
 
 namespace WebPortal
@@ -20,7 +21,7 @@ namespace WebPortal
         {
             const Weather &weather = WeatherService::data();
             const bool online = WiFi.status() == WL_CONNECTED;
-            String page = F("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>DeskBuddy</title><style>body{font:15px system-ui;margin:0;background:#10131c;color:#f7f8fc}main{max-width:460px;margin:auto;padding:24px 18px}h1{font-size:22px;margin:0 0 4px}.s{color:#a9b0c3;margin:0 0 18px}label{display:block;color:#a9b0c3;font-size:13px;margin:14px 0 6px}input{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid #424b67;background:#111522;color:#f7f8fc;font:inherit}button{font:inherit;cursor:pointer}.save{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;margin-top:18px;background:#67e8c2;color:#08120f;font-weight:700;border:0}.card{background:#1b2030;border:1px solid #343b53;border-radius:16px;padding:20px}.emotions{margin-top:14px}.emotions h2{font-size:17px;margin:0 0 4px}.mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.mode label{margin:0;padding:10px;border:1px solid #424b67;border-radius:10px;background:#111522;color:#f7f8fc;text-align:center;cursor:pointer}.mode input{width:auto;margin-right:6px}.emotes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.emote{min-height:76px;border:1px solid #424b67;border-radius:12px;background:#111522;color:#f7f8fc;padding:9px 5px}.emote.sel{border-color:#67e8c2;box-shadow:0 0 0 1px #67e8c2 inset}.face{display:block;color:#67e8c2;font:700 18px monospace;margin-bottom:5px}.hint{color:#a9b0c3;font-size:12px;margin:0 0 12px}.st{padding:10px 12px;background:#121724;border-radius:10px;margin-bottom:14px;color:#a9b0c3}.lrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a3147}.lrow.off{opacity:.45}.llabel{flex:1}.lbtn{background:#111522;color:#f7f8fc;border:1px solid #424b67;border-radius:8px;padding:4px 9px;font:inherit}.lbtn:disabled{opacity:.3}</style></head><body><main><h1>DeskBuddy</h1><p class=s>Status &amp; settings</p><div class=card>");
+            String page = F("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>DeskBuddy</title><style>body{font:15px system-ui;margin:0;background:#10131c;color:#f7f8fc}main{max-width:460px;margin:auto;padding:24px 18px}h1{font-size:22px;margin:0 0 4px}.s{color:#a9b0c3;margin:0 0 18px}label{display:block;color:#a9b0c3;font-size:13px;margin:14px 0 6px}input{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid #424b67;background:#111522;color:#f7f8fc;font:inherit}button{font:inherit;cursor:pointer}.save{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;margin-top:18px;background:#67e8c2;color:#08120f;font-weight:700;border:0}.card{background:#1b2030;border:1px solid #343b53;border-radius:16px;padding:20px}.emotions{margin-top:14px}.emotions h2{font-size:17px;margin:0 0 4px}.mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.mode label{margin:0;padding:10px;border:1px solid #424b67;border-radius:10px;background:#111522;color:#f7f8fc;text-align:center;cursor:pointer}.mode input{width:auto;margin-right:6px}.emotes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.emote{min-height:76px;border:1px solid #424b67;border-radius:12px;background:#111522;color:#f7f8fc;padding:9px 5px}.emote.sel{border-color:#67e8c2;box-shadow:0 0 0 1px #67e8c2 inset}.face{display:block;color:#67e8c2;font:700 18px monospace;margin-bottom:5px}.hint{color:#a9b0c3;font-size:12px;margin:0 0 12px}.st{padding:10px 12px;background:#121724;border-radius:10px;margin-bottom:14px;color:#a9b0c3}.lrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a3147}.lrow.off{opacity:.45}.llabel{flex:1}.lbtn{background:#111522;color:#f7f8fc;border:1px solid #424b67;border-radius:8px;padding:4px 9px;font:inherit}.lbtn:disabled{opacity:.3}textarea{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid #424b67;background:#111522;color:#f7f8fc;font:inherit;resize:vertical}.emojibar{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.ebtn{font-size:20px;line-height:1;background:#111522;border:1px solid #424b67;border-radius:8px;padding:5px 8px;cursor:pointer}</style></head><body><main><h1>DeskBuddy</h1><p class=s>Status &amp; settings</p><div class=card>");
             page += F("<div class=st>Status: ");
             if (online)
             {
@@ -72,6 +73,28 @@ namespace WebPortal
                 page += F("</button>");
             }
             page += F("</div><button class=save type=submit>Save behavior</button></form></div>");
+            page += F("<div class=card><h2>Sticky note</h2><p class=hint>Type any text (emojis supported). Shown auto-sized &amp; centered on the OLED.</p><form method=POST action=/sticky><textarea id=stk name=text maxlength=100 rows=2 placeholder='Write a note\xE2\x80\xA6'>");
+            page += Util::htmlEscape(Settings::stickyText());
+            page += F("</textarea><div class=emojibar>");
+            {
+                // Emojis the OLED can render as bitmaps (must match screen_sticky tiles).
+                static const char *const kEmoji[] = {
+                    "\xF0\x9F\x99\x82", "\xF0\x9F\x98\xA2", "\xE2\x9D\xA4\xEF\xB8\x8F",
+                    "\xE2\xAD\x90", "\xF0\x9F\x91\x8D", "\xF0\x9F\x94\xA5",
+                    "\xE2\x9C\x85", "\xE2\x98\x95", "\xF0\x9F\x92\xA1",
+                    "\xF0\x9F\x8E\x89", "\xF0\x9F\x98\x8E", "\xE2\x98\x80\xEF\xB8\x8F",
+                    "\xF0\x9F\x8C\x99", "\xF0\x9F\x98\xB4", "\xE2\x9C\xA8",
+                    "\xF0\x9F\x93\x9D"};
+                for (const char *e : kEmoji)
+                {
+                    page += F("<button type=button class=ebtn onclick=\"var t=document.getElementById('stk');t.value+='");
+                    page += e;
+                    page += F("';t.focus()\">");
+                    page += e;
+                    page += F("</button>");
+                }
+            }
+            page += F("</div><button class=save type=submit>Show on display</button></form></div>");
             page += F("<div class='card' id=loopcard><h2>Loop playlist</h2><p class=hint>Tick emotes (incl. Auto weather) for Loop mode and use the arrows to set order.</p><div class=mode><button type=button class=lbtn id=loopAll>Select all</button><button type=button class=lbtn id=loopNone>Remove all</button></div><div id=loopEditor></div>");
             char loopSecBuf[6];
             snprintf(loopSecBuf, sizeof(loopSecBuf), "%u", Settings::loopSeconds());
@@ -102,6 +125,47 @@ namespace WebPortal
             page += F("</b>%</label><input type=range min=5 max=100 step=5 value=");
             page += brPct;
             page += F(" oninput=\"document.getElementById('bv').textContent=this.value\" onchange=\"fetch('/brightness',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'level='+this.value})\"></div>");
+            page += F("<div class=card><h2>Power saving</h2><p class=hint>None keeps WiFi always on. Power saving parks WiFi and wakes it ~5 min before each internet task; WiFi &amp; dashboard also stay on for 30 min after every boot.</p><form method=POST action=/power><div class=mode><label><input type=radio name=mode value=none");
+            if (Settings::powerMode() == POWER_NONE)
+                page += F(" checked");
+            page += F(">No power saving</label><label><input type=radio name=mode value=saving");
+            if (Settings::powerMode() == POWER_SAVING)
+                page += F(" checked");
+            page += F(">Power saving</label></div>");
+            if (Settings::powerMode() == POWER_SAVING)
+            {
+                page += F("<div class=st>");
+                if (PowerManager::inBootWindow())
+                    page += F("Boot window active \xC2\xB7 WiFi stays on");
+                else if (!WifiManager::everConnected())
+                    page += F("Can't connect \xC2\xB7 WiFi stays on so this dashboard/AP stays reachable");
+                else if (PowerManager::radioParked())
+                {
+                    const uint32_t secs = PowerManager::msUntilNextWake() / 1000;
+                    char buf[48];
+                    snprintf(buf, sizeof(buf), "WiFi parked \xC2\xB7 next wake in %lu:%02lu",
+                             static_cast<unsigned long>(secs / 60), static_cast<unsigned long>(secs % 60));
+                    page += buf;
+                }
+                else
+                    page += F("WiFi awake for a scheduled task");
+                page += F("</div>");
+            }
+            page += F("<button class=save type=submit>Save power mode</button></form></div>");
+            {
+                char sBuf[6];
+                char eBuf[6];
+                snprintf(sBuf, sizeof(sBuf), "%02u:%02u", Settings::nightSleepStart() / 60, Settings::nightSleepStart() % 60);
+                snprintf(eBuf, sizeof(eBuf), "%02u:%02u", Settings::nightSleepEnd() / 60, Settings::nightSleepEnd() % 60);
+                page += F("<div class=card><h2>Quiet hours (deep sleep)</h2><p class=hint>Device fully powers down (display off) during this window each day and wakes at the end time, then resumes your chosen mode. Needs synced time.</p><form method=POST action=/sleep><label><input type=checkbox name=en style='width:auto;margin-right:8px'");
+                if (Settings::nightSleepEnabled())
+                    page += F(" checked");
+                page += F(">Enable scheduled deep sleep</label><div class=mode><div><label>Sleep at</label><input type=time name=start value=");
+                page += sBuf;
+                page += F("></div><div><label>Wake at</label><input type=time name=end value=");
+                page += eBuf;
+                page += F("></div></div><button class=save type=submit>Save quiet hours</button></form></div>");
+            }
             page += F("<p class=s style='text-align:center;margin-top:16px'><a style='color:#67e8c2' href='/health'>System health &amp; diagnostics \xE2\x86\x92</a></p>");
             page += F("</main><script>const moods=[");
             for (uint8_t i = 0; i < MOOD_COUNT; ++i)
@@ -443,6 +507,47 @@ namespace WebPortal
             server.send(200, F("text/plain"), F("OK"));
         }
 
+        void handlePower()
+        {
+            if (!server.hasArg("mode"))
+            {
+                server.send(400, F("text/plain"), F("Missing mode"));
+                return;
+            }
+            const String mode = server.arg("mode");
+            const uint8_t value = mode == F("saving") ? POWER_SAVING : POWER_NONE;
+            Settings::savePowerMode(value);
+            // Grant a fresh always-on window so the dashboard stays reachable
+            // right after the user opts into power saving.
+            if (value == POWER_SAVING)
+                PowerManager::resetBootWindow();
+            redirectHome();
+        }
+
+        // Parse an "HH:MM" time input into minutes past midnight (0-1439).
+        uint16_t parseHHMM(const String &s)
+        {
+            const int colon = s.indexOf(':');
+            if (colon < 0)
+                return 0;
+            int h = s.substring(0, colon).toInt();
+            int m = s.substring(colon + 1).toInt();
+            if (h < 0) h = 0;
+            if (h > 23) h = 23;
+            if (m < 0) m = 0;
+            if (m > 59) m = 59;
+            return static_cast<uint16_t>(h * 60 + m);
+        }
+
+        void handleSleep()
+        {
+            const bool enabled = server.hasArg("en");
+            const uint16_t startMin = server.hasArg("start") ? parseHHMM(server.arg("start")) : 60;
+            const uint16_t endMin = server.hasArg("end") ? parseHHMM(server.arg("end")) : 420;
+            Settings::saveNightSleep(enabled, startMin, endMin);
+            redirectHome();
+        }
+
         void handleLoop()
         {
             if (!server.hasArg("seq"))
@@ -460,6 +565,24 @@ namespace WebPortal
             msg += Settings::loopSeconds();
             msg += F("s each.");
             server.send(200, F("text/plain"), msg);
+        }
+
+        void handleSticky()
+        {
+            if (!server.hasArg("text"))
+            {
+                server.send(400, F("text/plain"), F("Missing text"));
+                return;
+            }
+            String text = server.arg("text");
+            if (text.length() > 200) // byte length; emojis are multi-byte
+                text = text.substring(0, 200);
+            Settings::saveStickyText(text);
+            // Switch to the Sticky Note emote so the note shows immediately.
+            Settings::saveEmoteMode(EMOTE_STATIC);
+            Settings::saveMood(MOOD_STICKY);
+            EmoteDirector::resetSchedule();
+            redirectHome();
         }
 
         void handleSave()
@@ -528,6 +651,9 @@ namespace WebPortal
         server.on("/pomodoro", HTTP_POST, handlePomodoro);
         server.on("/brightness", HTTP_POST, handleBrightness);
         server.on("/loop", HTTP_POST, handleLoop);
+        server.on("/sticky", HTTP_POST, handleSticky);
+        server.on("/power", HTTP_POST, handlePower);
+        server.on("/sleep", HTTP_POST, handleSleep);
         server.on("/health", handleHealthPage);
         server.on("/api/health", handleHealthJson);
         server.onNotFound(handleRoot); // serves dashboard + captive-portal catch-all

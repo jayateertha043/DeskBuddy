@@ -3,6 +3,10 @@
 #include <time.h>
 #include <cstring>
 
+#if !defined(ARDUINO_ARCH_ESP8266)
+#include <esp_sleep.h>
+#endif
+
 namespace Clock
 {
     namespace
@@ -11,6 +15,13 @@ namespace Clock
         time_t buildTimestamp = 0;   // Unix timestamp of build time
         uint32_t buildMillis = 0;    // millis() when buildTimestamp was recorded
         bool buildTimeInitialized = false;
+
+#if !defined(ARDUINO_ARCH_ESP8266)
+        // Retained in RTC memory so the timezone offset survives deep sleep
+        // (the RTC keeps UTC time running by itself; only this RAM offset is lost).
+        RTC_DATA_ATTR int32_t rtcUtcOffset = 0;
+        RTC_DATA_ATTR bool rtcOffsetValid = false;
+#endif
 
         // Parse __DATE__ ("Sep 14 2026") and __TIME__ ("14:30:45") into Unix timestamp
         time_t parseCompileTime()
@@ -69,6 +80,26 @@ namespace Clock
 
     void setUtcOffset(int32_t seconds) { utcOffsetSeconds = seconds; }
     int32_t utcOffset() { return utcOffsetSeconds; }
+
+    bool isSynced() { return time(nullptr) >= 100000; }
+
+    void prepareForDeepSleep()
+    {
+#if !defined(ARDUINO_ARCH_ESP8266)
+        rtcUtcOffset = utcOffsetSeconds;
+        rtcOffsetValid = true;
+#endif
+    }
+
+    void restoreAfterWake()
+    {
+#if !defined(ARDUINO_ARCH_ESP8266)
+        // The RTC keeps UTC time across deep sleep; just restore the offset so
+        // local-time widgets are correct immediately, before NTP re-syncs.
+        if (rtcOffsetValid && esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER)
+            utcOffsetSeconds = rtcUtcOffset;
+#endif
+    }
 
     String localTimeString()
     {

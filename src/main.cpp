@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 
+#include "platform.h"
 #include "core/clock.h"
 #include "core/settings.h"
 #include "display/canvas.h"
@@ -13,6 +14,7 @@
 #include "net/weather_service.h"
 #include "net/web_portal.h"
 #include "net/wifi_manager.h"
+#include "net/power_manager.h"
 #include "net/ota_service.h"
 #include "pomodoro.h"
 
@@ -20,6 +22,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(200);
+  platformLowerCpu(); // run at 80 MHz to reduce active current
   WifiManager::initLed();
 
   if (Canvas::begin())
@@ -34,9 +37,9 @@ void setup()
 
   Settings::load();
   WifiManager::begin();
+  PowerManager::begin();
   Clock::beginNtp();
-  Clock::initBuildTime();  // Initialize compile-time fallback for offline time
-  OtaService::init();
+  Clock::initBuildTime(); // Initialize compile-time fallback for offline time  Clock::restoreAfterWake(); // recover timezone offset if we woke from quiet-hours deep sleep  OtaService::init();
 }
 
 void loop()
@@ -47,6 +50,7 @@ void loop()
   WebPortal::handle();
   WifiManager::handlePortalDns();
   WifiManager::handleMdns();
+  PowerManager::loop();
   WifiManager::loop();
   WeatherService::loop();
   OtaService::update();
